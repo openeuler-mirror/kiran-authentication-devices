@@ -17,11 +17,4 @@
 
 namespace Kiran
 {
-// class FPContextFactory : public ContextFactory
-// {
-// public:
-//     explicit FPContextFactory(QObject *parent = nullptr);
-//     Context *CreateContext() override;
-// };
-
 }  // namespace Kiran

@@ -14,7 +14,6 @@
 #pragma once
 #include "context/context.h"
 
-
 namespace Kiran
 {
 class AuthDevice;
@@ -23,8 +22,6 @@ class FVSDContext : public Context
 public:
     explicit FVSDContext(QObject *parent = nullptr);
     AuthDevice* createDevice(const QString& idVendor, const QString& idProduct) override;
-private:
-    AuthDevice *m_device;
 };
 
 }  // namespace Kiran

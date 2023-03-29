@@ -55,7 +55,7 @@ bool FeatureDB::createDBConnection()
         QDir dir(DATABASE_DIR);
         if (!dir.exists())
         {
-            bool result = dir.mkpath(DATABASE_DIR);
+            dir.mkpath(DATABASE_DIR);
         }
         QString dbPath = QString("%1/FeatureDataBase.db").arg(DATABASE_DIR);
         m_database = QSqlDatabase::addDatabase("QSQLITE");

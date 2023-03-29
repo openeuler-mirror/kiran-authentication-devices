@@ -33,6 +33,7 @@ public:
 protected:
     QString m_soPath;
     QMap<QString, AuthDevice *> m_deviceMap;
+    AuthDevice *m_device;
 };
 
 }  // namespace Kiran

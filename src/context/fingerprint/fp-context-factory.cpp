@@ -16,13 +16,5 @@
 
 namespace Kiran
 {
-// FPContextFactory::FPContextFactory(QObject *parent)
-//     : ContextFactory{parent}
-// {
-// }
-
-// Context *FPContextFactory::CreateContext()
-// {
-// }
 
 }  // namespace Kiran

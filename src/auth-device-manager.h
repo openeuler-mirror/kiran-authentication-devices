@@ -43,12 +43,11 @@ public:
 
 public Q_SLOTS:
     QString GetDevices();
-    QString GetDevicesByType(int device_type);  // 返回json string
+    QString GetDevicesByType(int device_type); 
     QDBusObjectPath GetDevice(const QString &device_id);
     QStringList GetAllFeatureIDs();
     QString GetDriversByType(int device_type);
     void SetEnableDriver(const QString &driver_name, bool enable);
-    // TODO:增加root权限验证，只有root才能删除特征
     void Remove(const QString &feature_id);
 
 private Q_SLOTS:
@@ -76,8 +75,6 @@ private:
     static AuthDeviceManager *m_instance;
     struct udev *m_udev;
     struct udev_monitor *m_monitor;
-
-    // FpContext* m_ctx;
 
     int m_fd;
     AuthDeviceManagerAdaptor *m_dbusAdaptor;

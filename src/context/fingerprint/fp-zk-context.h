@@ -23,9 +23,7 @@ class FPZKContext : public Context
 {
 public:
     explicit FPZKContext(QObject *parent = nullptr);
-    AuthDevice* createDevice(const QString& idVendor, const QString& idProduct) override;
-private:
-    AuthDevice *m_device;
+    AuthDevice* createDevice(const QString& idVendor, const QString& idProduct) override;  
 };
 
 }  // namespace Kiran
