@@ -1,0 +1,3 @@
+#pragma once
+
+#define TRANSLATE_PREFIX           "@TRANSLATION_INSTALL_DIR@"
