@@ -15,12 +15,13 @@
 #pragma once
 
 #include <libudev.h>
+#include <QDBusContext>
 #include <QDBusObjectPath>
 #include <QObject>
+#include <QSharedPointer>
 #include <QSocketNotifier>
 #include <QTimer>
 #include "auth-enum.h"
-#include <QDBusContext>
 
 class AuthDeviceManagerAdaptor;
 
@@ -43,7 +44,7 @@ public:
 
 public Q_SLOTS:
     QString GetDevices();
-    QString GetDevicesByType(int device_type); 
+    QString GetDevicesByType(int device_type);
     QDBusObjectPath GetDevice(const QString &device_id);
     QStringList GetAllFeatureIDs();
     QString GetDriversByType(int device_type);
@@ -64,8 +65,8 @@ private:
     void processDevice(struct udev_device *dev);
     void deviceSimpleInfo(struct udev_device *dev);
 
-    void onRemove(const QDBusMessage &message,const QString &feature_id);
-    void onSetEnableDriver(const QDBusMessage &message,const QString &driver_name, bool enable);
+    void onRemove(const QDBusMessage &message, const QString &feature_id);
+    void onSetEnableDriver(const QDBusMessage &message, const QString &driver_name, bool enable);
 
 Q_SIGNALS:
     void DeviceAdded(int device_type, const QString &device_id);
@@ -73,19 +74,18 @@ Q_SIGNALS:
 
 private:
     static AuthDeviceManager *m_instance;
-    struct udev *m_udev;
-    struct udev_monitor *m_monitor;
+    QSharedPointer<udev> m_udev;
+    QSharedPointer<udev_monitor> m_monitor;
 
     int m_fd;
-    AuthDeviceManagerAdaptor *m_dbusAdaptor;
-    QSocketNotifier *m_socketNotifierRead;
+    QSharedPointer<AuthDeviceManagerAdaptor> m_dbusAdaptor;
+    QSharedPointer<QSocketNotifier> m_socketNotifierRead;
     // 总线 -- AuthDevice对象对应
     QMap<QString, AuthDevice *> m_deviceMap;
-    ContextFactory *m_contextFactory;
-
-    QTimer *m_timer;
+    QSharedPointer<ContextFactory> m_contextFactory;
+    QTimer m_timer;
 
     // 设备信息-重试次数
-    QMap<DeviceInfo,int> m_retreyCreateDeviceMap;
+    QMap<DeviceInfo, int> m_retreyCreateDeviceMap;
 };
 }  // namespace Kiran

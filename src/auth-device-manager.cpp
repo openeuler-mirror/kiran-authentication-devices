@@ -18,9 +18,9 @@
 #include <QDBusConnection>
 #include <QDBusError>
 #include <QDBusMessage>
-#include "device/auth-device.h"
 #include "auth_device_manager_adaptor.h"
 #include "context/context-factory.h"
+#include "device/auth-device.h"
 #include "feature-db.h"
 #include "kiran-auth-device-i.h"
 #include "polkit-proxy.h"
@@ -148,7 +148,7 @@ void AuthDeviceManager::onRemove(const QDBusMessage& message, const QString& fea
 {
     bool result = FeatureDB::getInstance()->deleteFeature(feature_id);
     KLOG_DEBUG() << "deleteFeature:" << feature_id
-                 << "result" << result;
+                 << "exec:" << result;
     auto replyMessage = message.createReply();
     QDBusConnection::systemBus().send(replyMessage);
 }
@@ -192,10 +192,9 @@ CHECK_AUTH_WITH_2ARGS(AuthDeviceManager, SetEnableDriver, onSetEnableDriver, AUT
 
 void AuthDeviceManager::init()
 {
-    m_dbusAdaptor = new AuthDeviceManagerAdaptor(this);
-    m_contextFactory = ContextFactory::instance();
-    m_timer = new QTimer(this);
-    connect(m_timer, &QTimer::timeout, this, &AuthDeviceManager::handleDeviceReCreate);
+    m_dbusAdaptor = QSharedPointer<AuthDeviceManagerAdaptor>(new AuthDeviceManagerAdaptor(this));
+    m_contextFactory = QSharedPointer<ContextFactory>(ContextFactory::instance());
+    connect(&m_timer, &QTimer::timeout, this, &AuthDeviceManager::handleDeviceReCreate);
 
     QDBusConnection dbusConnection = QDBusConnection::systemBus();
     if (!dbusConnection.registerService(AUTH_DEVICE_DBUS_NAME))
@@ -214,14 +213,14 @@ void AuthDeviceManager::init()
             KLOG_ERROR() << "Can't register object:" << dbusConnection.lastError();
     }
 
-    m_udev = udev_new();
+    m_udev = QSharedPointer<udev> (udev_new());
     if (!m_udev)
     {
         KLOG_ERROR() << "new udev error";
     }
 
-    initDeviceMonitor(m_udev);
-    auto usbInfoList = enumerateDevices(m_udev);
+    initDeviceMonitor(m_udev.data());
+    auto usbInfoList = enumerateDevices(m_udev.data());
     // 枚举设备后，生成设备对象
     Q_FOREACH (auto deviceInfo, usbInfoList)
     {
@@ -243,16 +242,16 @@ void AuthDeviceManager::init()
 void AuthDeviceManager::initDeviceMonitor(struct udev* udev)
 {
     // 创建一个新的monitor
-    m_monitor = udev_monitor_new_from_netlink(udev, "udev");
+    m_monitor = QSharedPointer<udev_monitor> (udev_monitor_new_from_netlink(udev, "udev"));
     // 增加一个udev事件过滤器
-    udev_monitor_filter_add_match_subsystem_devtype(m_monitor, "usb", nullptr);
+    udev_monitor_filter_add_match_subsystem_devtype(m_monitor.data(), "usb", nullptr);
     // 启动监控
-    udev_monitor_enable_receiving(m_monitor);
+    udev_monitor_enable_receiving(m_monitor.data());
     // 获取该监控的文件描述符，fd就代表了这个监控
-    m_fd = udev_monitor_get_fd(m_monitor);
+    m_fd = udev_monitor_get_fd(m_monitor.data());
 
-    m_socketNotifierRead = new QSocketNotifier(m_fd, QSocketNotifier::Read, this);
-    connect(m_socketNotifierRead, &QSocketNotifier::activated, this, &AuthDeviceManager::handleSocketNotifierRead);
+    m_socketNotifierRead = QSharedPointer<QSocketNotifier>(new QSocketNotifier(m_fd, QSocketNotifier::Read, this));
+    connect(m_socketNotifierRead.data(), &QSocketNotifier::activated, this, &AuthDeviceManager::handleSocketNotifierRead);
 }
 
 void AuthDeviceManager::handleSocketNotifierRead(int socket)
@@ -274,7 +273,7 @@ void AuthDeviceManager::handleSocketNotifierRead(int socket)
         return;
 
     // 获取产生事件的设备映射
-    struct udev_device* dev = udev_monitor_receive_device(m_monitor);
+    struct udev_device* dev = udev_monitor_receive_device(m_monitor.data());
     if (!dev)
         return;
 
@@ -317,11 +316,11 @@ void AuthDeviceManager::handleSocketNotifierRead(int socket)
 QList<DeviceInfo> AuthDeviceManager::enumerateDevices(struct udev* udev)
 {
     // 创建一个枚举器用于扫描已连接的设备
-    struct udev_enumerate* enumerate = udev_enumerate_new(udev);  
+    struct udev_enumerate* enumerate = udev_enumerate_new(udev);
     udev_enumerate_add_match_subsystem(enumerate, SUBSYSTEM);
     udev_enumerate_scan_devices(enumerate);
     // 返回一个存储了设备所有属性信息的链表
-    struct udev_list_entry* devices = udev_enumerate_get_list_entry(enumerate);  
+    struct udev_list_entry* devices = udev_enumerate_get_list_entry(enumerate);
     struct udev_list_entry* entry;
 
     QList<DeviceInfo> usbInfoList;
@@ -329,7 +328,7 @@ QList<DeviceInfo> AuthDeviceManager::enumerateDevices(struct udev* udev)
     {
         const char* path = udev_list_entry_get_name(entry);
         // 创建一个udev设备的映射
-        struct udev_device* dev = udev_device_new_from_syspath(udev, path);  
+        struct udev_device* dev = udev_device_new_from_syspath(udev, path);
         DeviceInfo usbInfo;
         usbInfo.idVendor = udev_device_get_sysattr_value(dev, "idVendor");
         usbInfo.idProduct = udev_device_get_sysattr_value(dev, "idProduct");
@@ -419,16 +418,16 @@ void AuthDeviceManager::handleDeviceCreateFail(DeviceInfo deviceInfo)
     m_retreyCreateDeviceMap.insert(deviceInfo, 0);
     if (m_retreyCreateDeviceMap.count() != 0)
     {
-        if (!m_timer->isActive())
+        if (!m_timer.isActive())
         {
-            m_timer->start(1000);
+            m_timer.start(1000);
         }
     }
 }
 
 void AuthDeviceManager::handleDeviceDeleted()
 {
-    QList<DeviceInfo> newUsbInfoList = enumerateDevices(m_udev);
+    QList<DeviceInfo> newUsbInfoList = enumerateDevices(m_udev.data());
     QStringList newBusList;
     Q_FOREACH (auto newUsbInfo, newUsbInfoList)
     {
@@ -468,7 +467,7 @@ void AuthDeviceManager::handleDeviceReCreate()
 {
     if (m_retreyCreateDeviceMap.count() == 0)
     {
-        m_timer->stop();
+        m_timer.stop();
     }
     else
     {

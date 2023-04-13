@@ -42,7 +42,7 @@ bool AuthDevice::init()
 {
     if (initDevice())
     {
-        m_dbusAdaptor = new AuthDeviceAdaptor(this);
+        m_dbusAdaptor = QSharedPointer<AuthDeviceAdaptor>(new AuthDeviceAdaptor(this));
         m_deviceID = QUuid::createUuid().toString(QUuid::WithoutBraces);
         m_deviceStatus = DEVICE_STATUS_IDLE;
         registerDBusObject();
@@ -71,17 +71,17 @@ void AuthDevice::registerDBusObject()
 
 void AuthDevice::initFutureWatcher()
 {
-    m_futureWatcher = new QFutureWatcher<QByteArray>(this);
-    connect(m_futureWatcher, &QFutureWatcher<QByteArray>::finished, this, &AuthDevice::handleAcquiredFeature);
+    m_futureWatcher = QSharedPointer<QFutureWatcher<QByteArray>>(new QFutureWatcher<QByteArray>(this));
+    connect(m_futureWatcher.data(), &QFutureWatcher<QByteArray>::finished, this, &AuthDevice::handleAcquiredFeature);
     connect(this, &AuthDevice::retry, this, &AuthDevice::handleRetry);
 }
 
 void AuthDevice::initServiceWatcher()
 {
-    m_serviceWatcher = new QDBusServiceWatcher(this);
+    m_serviceWatcher = QSharedPointer<QDBusServiceWatcher>(new QDBusServiceWatcher(this));
     this->m_serviceWatcher->setConnection(QDBusConnection::systemBus());
     this->m_serviceWatcher->setWatchMode(QDBusServiceWatcher::WatchForUnregistration);
-    connect(m_serviceWatcher, &QDBusServiceWatcher::serviceUnregistered, this, &AuthDevice::onNameLost);
+    connect(m_serviceWatcher.data(), &QDBusServiceWatcher::serviceUnregistered, this, &AuthDevice::onNameLost);
 }
 
 void AuthDevice::onNameLost(const QString& serviceName)
@@ -108,6 +108,15 @@ void AuthDevice::clearWatchedServices()
     {
         m_serviceWatcher->removeWatchedService(service);
     }
+}
+
+DeviceInfo AuthDevice::deviceInfo()
+{
+    DeviceInfo deviceInfo;
+    deviceInfo.idVendor = m_idVendor;
+    deviceInfo.idProduct = m_idProduct;
+    deviceInfo.busPath = "";
+    return deviceInfo;
 }
 
 void AuthDevice::setDeviceType(DeviceType deviceType)
@@ -153,26 +162,15 @@ void AuthDevice::onEnrollStart(const QDBusMessage& dbusMessage, const QString& e
         KLOG_DEBUG() << message;
         return;
     }
-
-    // 获取当前保存的指纹模板，判断是否达到最大指纹数目
-    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct);
-    if (saveList.count() == TEMPLATE_MAX_NUMBER)
+    QJsonValue ukeyValue = Utils::getValueFromJsonString(extraInfo, AUTH_DEVICE_JSON_KEY_UKEY);
+    if (ukeyValue.isNull())
     {
-        message = tr("feature has reached the upper limit of %1").arg(TEMPLATE_MAX_NUMBER);
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
-        KLOG_ERROR() << message;
-        return;
+        onBioEnrollStart(dbusMessage);
     }
-
-    setDeviceStatus(DEVICE_STATUS_DOING_ENROLL);
-    m_doEnroll = true;
-
-    auto future = QtConcurrent::run(this, &AuthDevice::acquireFeature);
-    m_futureWatcher->setFuture(future);
-    m_serviceWatcher->addWatchedService(dbusMessage.service());
-
-    auto replyMessage = dbusMessage.createReply();
-    QDBusConnection::systemBus().send(replyMessage);
+    else
+    {
+        onUKeyEnrollStart(dbusMessage, ukeyValue);
+    }
 }
 
 void AuthDevice::onEnrollStop(const QDBusMessage& dbusMessage)
@@ -180,7 +178,6 @@ void AuthDevice::onEnrollStop(const QDBusMessage& dbusMessage)
     if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
     {
         acquireFeatureStop();
-        m_doEnroll = false;
         m_enrollTemplates.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
@@ -189,6 +186,49 @@ void AuthDevice::onEnrollStop(const QDBusMessage& dbusMessage)
 
     auto replyMessage = dbusMessage.createReply();
     QDBusConnection::systemBus().send(replyMessage);
+}
+
+void AuthDevice::onBioEnrollStart(const QDBusMessage& dbusMessage)
+{
+    QString message;
+    // 获取当前保存的特征模板，判断是否达到最大数目
+    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct);
+    if (saveList.count() == TEMPLATE_MAX_NUMBER)
+    {
+        message = tr("feature has reached the upper limit of %1").arg(TEMPLATE_MAX_NUMBER);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        KLOG_ERROR() << message;
+        return;
+    }
+    setDeviceStatus(DEVICE_STATUS_DOING_ENROLL);
+    auto future = QtConcurrent::run(this, &AuthDevice::acquireFeature);
+    m_futureWatcher->setFuture(future);
+    m_serviceWatcher->addWatchedService(dbusMessage.service());
+    auto replyMessage = dbusMessage.createReply();
+    QDBusConnection::systemBus().send(replyMessage);
+}
+
+void AuthDevice::onUKeyEnrollStart(const QDBusMessage& dbusMessage, QJsonValue ukeyValue)
+{
+    QString message;
+    auto jsonObject = ukeyValue.toObject();
+    m_pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
+    bool rebinding = jsonObject.value(AUTH_DEVICE_JSON_KEY_REBINDING).toBool();
+    if (m_pin.isEmpty())
+    {
+        message = tr("The pin code cannot be empty!");
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        KLOG_ERROR() << message;
+        return;
+    }
+    else
+    {
+        setDeviceStatus(DEVICE_STATUS_DOING_ENROLL);
+        doingUKeyEnrollStart(m_pin, rebinding);
+        m_serviceWatcher->addWatchedService(dbusMessage.service());
+        auto replyMessage = dbusMessage.createReply();
+        QDBusConnection::systemBus().send(replyMessage);
+    }
 }
 
 void AuthDevice::onIdentifyStart(const QDBusMessage& dbusMessage, const QString& value)
@@ -202,10 +242,7 @@ void AuthDevice::onIdentifyStart(const QDBusMessage& dbusMessage, const QString&
         return;
     }
 
-    setDeviceStatus(DEVICE_STATUS_DOING_IDENTIFY);
-    m_doIdentify = true;
-
-    QJsonArray jsonArray = Utils::getValueFromJsonString(value, "feature_ids").toArray();
+    QJsonArray jsonArray = Utils::getValueFromJsonString(value, AUTH_DEVICE_JSON_KEY_FEATURE_IDS).toArray();
     if (!jsonArray.isEmpty())
     {
         QVariantList varList = jsonArray.toVariantList();
@@ -214,12 +251,16 @@ void AuthDevice::onIdentifyStart(const QDBusMessage& dbusMessage, const QString&
             m_identifyIDs << var.toString();
         }
     }
-    auto future = QtConcurrent::run(this, &AuthDevice::acquireFeature);
-    m_futureWatcher->setFuture(future);
-    m_serviceWatcher->addWatchedService(dbusMessage.service());
 
-    auto replyMessage = dbusMessage.createReply();
-    QDBusConnection::systemBus().send(replyMessage);
+    QJsonValue ukeyValue = Utils::getValueFromJsonString(value, AUTH_DEVICE_JSON_KEY_UKEY);
+    if (ukeyValue.isUndefined())
+    {
+        onBioIdentifyStart(dbusMessage);
+    }
+    else
+    {
+        onUKeyIdentifyStart(dbusMessage, ukeyValue);
+    }
 }
 
 void AuthDevice::onIdentifyStop(const QDBusMessage& message)
@@ -227,7 +268,6 @@ void AuthDevice::onIdentifyStop(const QDBusMessage& message)
     if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
     {
         acquireFeatureStop();
-        m_doIdentify = false;
         m_identifyIDs.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
@@ -235,6 +275,40 @@ void AuthDevice::onIdentifyStop(const QDBusMessage& message)
     }
     auto replyMessage = message.createReply();
     QDBusConnection::systemBus().send(replyMessage);
+}
+
+void AuthDevice::onBioIdentifyStart(const QDBusMessage& dbusMessage)
+{
+    setDeviceStatus(DEVICE_STATUS_DOING_IDENTIFY);
+    auto future = QtConcurrent::run(this, &AuthDevice::acquireFeature);
+    m_futureWatcher->setFuture(future);
+
+    m_serviceWatcher->addWatchedService(dbusMessage.service());
+    auto replyMessage = dbusMessage.createReply();
+    QDBusConnection::systemBus().send(replyMessage);
+}
+
+void AuthDevice::onUKeyIdentifyStart(const QDBusMessage& dbusMessage, QJsonValue ukeyValue)
+{
+    QString message;
+    auto jsonObject = ukeyValue.toObject();
+    m_pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
+
+    if (m_pin.isEmpty())
+    {
+        message = tr("The pin code cannot be empty!");
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_RESULT_NOT_MATCH, message);
+        KLOG_ERROR() << message;
+        return;
+    }
+    else
+    {
+        setDeviceStatus(DEVICE_STATUS_DOING_IDENTIFY);
+        doingUKeyIdentifyStart(m_pin);
+        m_serviceWatcher->addWatchedService(dbusMessage.service());
+        auto replyMessage = dbusMessage.createReply();
+        QDBusConnection::systemBus().send(replyMessage);
+    }
 }
 
 CHECK_AUTH_WITH_1ARGS(AuthDevice, EnrollStart, onEnrollStart, AUTH_USER_ADMIN, const QString&)
@@ -248,87 +322,11 @@ QStringList AuthDevice::GetFeatureIDList()
     return featureIDs;
 }
 
-void AuthDevice::doingEnrollProcess(QByteArray feature)
-{
-    if (!m_doEnroll)
-    {
-        return;
-    }
-    QString message;
-    if (feature.isEmpty())
-    {
-        acquireFeatureFail();
-        return;
-    }
-
-    int templatesCount = enrollTemplatesFromCache().count();
-    if (templatesCount == 0)
-    {
-        // 第一个指纹模板入录时，检查该指纹是否录入过
-        QString featureID = isFeatureEnrolled(feature);
-        if (featureID.isEmpty())
-        {
-            saveEnrollTemplateToCache(feature);
-            enrollProcessRetry();
-        }
-        else
-        {
-            notifyEnrollProcess(ENROLL_PROCESS_REPEATED_ENROLL, featureID);
-            internalStopEnroll();
-        }
-    }
-    else if (templatesCount < needTemplatesCountForEnroll())
-    {
-        // 判断录入时是否录的是同一根手指
-        int matchResult = templateMatch(m_enrollTemplates.value(0), feature);
-        if (matchResult == GENERAL_RESULT_OK)
-        {
-            saveEnrollTemplateToCache(feature);
-        }
-        else
-        {
-            notifyEnrollProcess(ENROLL_PROCESS_INCONSISTENT_FEATURE);
-        }
-        enrollProcessRetry();
-    }
-    else if (enrollTemplatesFromCache().count() == needTemplatesCountForEnroll())
-    {
-        enrollTemplateMerge();
-    }
-}
-
-void AuthDevice::doingIdentifyProcess(QByteArray feature)
-{
-    if (!m_doIdentify)
-    {
-        KLOG_DEBUG() << "device busy";
-        return;
-    }
-    if (feature.isEmpty())
-    {
-        acquireFeatureFail();
-        return;
-    }
-
-    QString featureID = identifyFeature(feature, m_identifyIDs);
-    if (!featureID.isEmpty())
-    {
-        notifyIdentifyProcess(IDENTIFY_PROCESS_MACTCH,featureID);
-    }
-    else
-    {
-        notifyIdentifyProcess(IDENTIFY_PROCESS_NO_MATCH);
-    }
-
-    internalStopIdentify();
-}
-
 void AuthDevice::internalStopEnroll()
 {
     if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
     {
         acquireFeatureStop();
-        m_doEnroll = false;
         m_enrollTemplates.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
@@ -341,7 +339,6 @@ void AuthDevice::internalStopIdentify()
     if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
     {
         acquireFeatureStop();
-        m_doIdentify = false;
         m_identifyIDs.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
@@ -349,28 +346,15 @@ void AuthDevice::internalStopIdentify()
     }
 }
 
-void AuthDevice::enrollProcessRetry()
-{
-    Q_EMIT this->retry();
-}
-
-void AuthDevice::saveEnrollTemplateToCache(QByteArray enrollTemplate)
-{
-    if (!enrollTemplate.isEmpty())
-    {
-        m_enrollTemplates << enrollTemplate;
-        KLOG_DEBUG() << "enroll template:" << enrollTemplate;
-        notifyEnrollProcess(ENROLL_PROCESS_PASS);
-    }
-}
-
-QByteArrayList AuthDevice::enrollTemplatesFromCache()
-{
-    return m_enrollTemplates;
-}
-
 void AuthDevice::handleAcquiredFeature()
 {
+    QByteArray feature = m_futureWatcher->result();
+    if (feature.isEmpty())
+    {
+        acquireFeatureFail();
+        return;
+    }
+
     switch (deviceStatus())
     {
     case DEVICE_STATUS_DOING_ENROLL:

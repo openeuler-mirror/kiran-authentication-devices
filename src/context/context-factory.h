@@ -15,13 +15,14 @@
 
 #include <QObject>
 #include "context.h"
-
+#include <QSharedPointer>
 
 namespace Kiran
 {
 class FPZKContext;
 class FPBuiltInContext;
 class FVSDContext;
+class UKeyFTContext;
 
 class ContextFactory : public QObject
 {
@@ -43,11 +44,13 @@ private:
     void init();
     AuthDevice* createFingerPrintDevice(const QString& idVendor, const QString& idProduct);
     AuthDevice* createFingerVeinDevice(const QString& idVendor, const QString& idProduct);
+    AuthDevice* createUKeyDevice(const QString& idVendor, const QString& idProduct);
 
 private:
     QStringList m_idVendorList;
-    FPZKContext* m_fpZKContext;
-    FPBuiltInContext* m_fpBuiltInContext;
-    FVSDContext* m_fvSDContext;
+    QSharedPointer<FPZKContext> m_fpZKContext;
+    QSharedPointer<FPBuiltInContext> m_fpBuiltInContext;
+    QSharedPointer<FVSDContext> m_fvSDContext;
+    QSharedPointer<UKeyFTContext> m_ukeyFTContext;
 };
 }  // namespace Kiran

@@ -17,7 +17,7 @@
 namespace Kiran
 {
 FPDevice::FPDevice(QObject *parent)
-    : AuthDevice{parent}
+    : BioDevice{parent}
 {
 }
 

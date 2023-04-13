@@ -140,18 +140,15 @@ FPZKDevice::FPZKDevice(QObject* parent)
 FPZKDevice::~FPZKDevice()
 {
     acquireFeatureStop();
-    m_futureWatcher->deleteLater();
     if (m_hDBCache)
     {
         m_driverLib->ZKFPM_DBFree(m_hDBCache);
         m_hDBCache = NULL;
     }
 
-    if (m_driverLib)
+    if (m_driverLib.data())
     {
         m_driverLib->ZKFPM_Terminate();  // 释放资源
-        delete m_driverLib;
-        m_driverLib = nullptr;
     }
 
     if (m_libHandle)
@@ -193,7 +190,7 @@ bool FPZKDevice::loadLib()
         return false;
     }
 
-    m_driverLib = new DriverLib;
+    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
     m_driverLib->ZKFPM_Init = (T_ZKFPM_Init)dlsym(m_libHandle, "ZKFPM_Init");
     if (NULL == m_driverLib->ZKFPM_Init)
     {
@@ -323,7 +320,7 @@ QByteArray FPZKDevice::acquireFeature()
 void FPZKDevice::acquireFeatureStop()
 {
     m_doAcquire = false;
-    if (m_futureWatcher != nullptr)
+    if (m_futureWatcher.data() != nullptr)
     {
         m_futureWatcher->waitForFinished();
     }
@@ -374,18 +371,15 @@ int FPZKDevice::templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
     return score > 0 ? GENERAL_RESULT_OK : GENERAL_RESULT_FAIL;
 }
 
-QString FPZKDevice::isFeatureEnrolled(QByteArray fpTemplate)
-{
-    return identifyFeature(fpTemplate, QStringList());
-}
 
 QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureIDs)
 {
     QList<QByteArray> saveList;
     QString featureID;
+    DeviceInfo info  = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct);
+        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct);
     }
     else
     {
@@ -416,9 +410,7 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
 
 bool FPZKDevice::saveFPrintTemplate(QByteArray fpTemplate, const QString& featureID)
 {
-    DeviceInfo deviceInfo;
-    deviceInfo.idVendor = m_idVendor;
-    deviceInfo.idProduct = m_idProduct;
+    DeviceInfo deviceInfo = this->deviceInfo();
     bool save = FeatureDB::getInstance()->addFeature(featureID, fpTemplate, deviceInfo);
     return save;
 }
@@ -469,7 +461,7 @@ void FPZKDevice::enrollTemplateMerge()
     internalStopEnroll();
 }
 
-int FPZKDevice::needTemplatesCountForEnroll()
+int FPZKDevice::mergeTemplateCount()
 {
     return FP_ZK_MEGER_TEMPLATE_COUNT;
 }
