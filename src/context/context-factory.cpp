@@ -15,11 +15,12 @@
 #include "context-factory.h"
 #include <qt5-log-i.h>
 #include <QMutex>
+#include "finger-vein/fv-sd-context.h"
 #include "fingerprint/fp-builtin-context.h"
 #include "fingerprint/fp-zk-context.h"
-#include "finger-vein/fv-sd-context.h"
 #include "kiran-auth-device-i.h"
 #include "third-party-device.h"
+#include "ukey/ukey-ft-context.h"
 
 namespace Kiran
 {
@@ -47,9 +48,10 @@ ContextFactory::ContextFactory(QObject* parent)
 
 void ContextFactory::init()
 {
-    m_fpZKContext = new FPZKContext();
-    m_fpBuiltInContext = new FPBuiltInContext();
-    m_fvSDContext = new FVSDContext();
+    m_fpZKContext = QSharedPointer<FPZKContext>(new FPZKContext());
+    m_fpBuiltInContext = QSharedPointer<FPBuiltInContext>(new FPBuiltInContext());
+    m_fvSDContext = QSharedPointer<FVSDContext>(new FVSDContext());
+    m_ukeyFTContext = QSharedPointer<UKeyFTContext>(new UKeyFTContext());
 }
 
 AuthDevice* ContextFactory::createDevice(const QString& idVendor, const QString& idProduct)
@@ -71,6 +73,9 @@ AuthDevice* ContextFactory::createDevice(const QString& idVendor, const QString&
                 break;
             case DEVICE_TYPE_FingerVein:
                 device = createFingerVeinDevice(idVendor, idProduct);
+                break;
+            case DEVICE_TYPE_UKey:
+                device = createUKeyDevice(idVendor, idProduct);
                 break;
             default:
                 break;
@@ -118,6 +123,18 @@ AuthDevice* ContextFactory::createFingerVeinDevice(const QString& idVendor, cons
     }
     else
         return nullptr;
+}
+
+AuthDevice* ContextFactory::createUKeyDevice(const QString& idVendor, const QString& idProduct)
+{
+    if (idVendor == FT_ID_VENDOR)
+    {
+        return m_ukeyFTContext->createDevice(idVendor, idProduct);
+    }
+    else
+    {
+        return nullptr;
+    };
 }
 
 Context* ContextFactory::CreateContext()

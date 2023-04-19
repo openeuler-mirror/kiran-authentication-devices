@@ -111,7 +111,7 @@ struct DriverLib
     TGSetDevLedFunc TGSetDevLed;
 };
 
-FVSDDevice::FVSDDevice(QObject *parent) : AuthDevice{parent},
+FVSDDevice::FVSDDevice(QObject *parent) : BioDevice{parent},
                                           m_driverLib(nullptr),
                                           m_libProcessHandle(nullptr),
                                           m_libComHandle(nullptr)
@@ -125,15 +125,8 @@ FVSDDevice::~FVSDDevice()
     if (!deviceID().isEmpty())
     {
         acquireFeatureStop();
-        m_futureWatcher->deleteLater();
         KLOG_DEBUG() << "TGGetDevStatus():" << m_driverLib->TGGetDevStatus();
         m_driverLib->TGCloseDev();
-    }
-
-    if (m_driverLib)
-    {
-        delete m_driverLib;
-        m_driverLib = nullptr;
     }
 
     if (m_libComHandle)
@@ -166,7 +159,7 @@ bool FVSDDevice::loadLib()
         return false;
     }
 
-    m_driverLib = new DriverLib;
+    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
     m_driverLib->TGInitFVProcess = (TGInitFVProcessFunc)dlsym(m_libProcessHandle, "TGInitFVProcess");
     m_driverLib->TGImgExtractFeatureVerify = (TGImgExtractFeatureVerifyFunc)dlsym(m_libProcessHandle, "TGImgExtractFeatureVerify");
     m_driverLib->TGFeaturesFusionTmpl = (TGFeaturesFusionTmplFunc)dlsym(m_libProcessHandle, "TGFeaturesFusionTmpl");
@@ -221,11 +214,11 @@ bool FVSDDevice::initDevice()
     }
     KLOG_DEBUG() << "Device opened successfully:" << ret;
 
-    ret = m_driverLib->TGGetDevFW(fw);
+    m_driverLib->TGGetDevFW(fw);
     KLOG_DEBUG() << "Get firmware version:" << fw;
-    ret = m_driverLib->TGGetDevSN(sn);
+    m_driverLib->TGGetDevSN(sn);
     KLOG_DEBUG() << "Obtain device SN number:" << sn;
-    ret = m_driverLib->TGPlayDevVoice(VOICE_VOLUME1);
+    m_driverLib->TGPlayDevVoice(VOICE_VOLUME1);
 
     return true;
 }
@@ -291,7 +284,7 @@ QByteArray FVSDDevice::acquireFeature()
 void FVSDDevice::acquireFeatureStop()
 {
     m_driverLib->TGCancelGetImage();
-    if (m_futureWatcher != nullptr)
+    if (m_futureWatcher.data() != nullptr)
     {
         m_futureWatcher->waitForFinished();
     }
@@ -357,9 +350,7 @@ void FVSDDevice::enrollTemplateMerge()
     {
         QString id = QCryptographicHash::hash(mergedTemplate, QCryptographicHash::Md5).toHex();
 
-        DeviceInfo deviceInfo;
-        deviceInfo.idVendor = m_idVendor;
-        deviceInfo.idProduct = m_idProduct;
+        DeviceInfo deviceInfo = this->deviceInfo();
         bool save = FeatureDB::getInstance()->addFeature(id, mergedTemplate, deviceInfo);
         if (save)
         {
@@ -396,9 +387,10 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
 {
     QList<QByteArray> saveList;
     QString featureID;
+    DeviceInfo deviceInfo = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct);
+        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct);
     }
     else
     {
@@ -481,7 +473,7 @@ BDriver *FVSDDevice::getDriver()
     return nullptr;
 }
 
-int FVSDDevice::needTemplatesCountForEnroll()
+int FVSDDevice::mergeTemplateCount()
 {
     return TEMPLATE_FV_NUM;
 }

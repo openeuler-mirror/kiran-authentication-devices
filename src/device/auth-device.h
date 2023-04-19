@@ -14,7 +14,6 @@
 
 #pragma once
 
-// #include "auth_device_adaptor.h"
 #include <QDBusContext>
 #include <QDBusObjectPath>
 #include <QDBusServiceWatcher>
@@ -22,12 +21,13 @@
 #include <QObject>
 #include "auth-enum.h"
 #include "kiran-auth-device-i.h"
+#include <QSharedPointer>
 
 class AuthDeviceAdaptor;
 
 namespace Kiran
 {
-typedef void* Handle;
+typedef void *Handle;
 class BDriver;
 
 class AuthDevice : public QObject, protected QDBusContext
@@ -40,19 +40,21 @@ class AuthDevice : public QObject, protected QDBusContext
 
 public:
     explicit AuthDevice(QObject *parent = nullptr);
+   
     virtual ~AuthDevice();
     bool init();
 
     virtual bool initDevice() = 0;
     virtual BDriver *getDriver() = 0;
-    QDBusObjectPath getObjectPath() { return m_objectPath; };
 
+    QDBusObjectPath getObjectPath() { return m_objectPath; };
     QString deviceID() { return m_deviceID; };
     QString deviceDriver() { return m_deviceDriver; };
     int deviceType() { return m_deviceType; };
     int deviceStatus() { return m_deviceStatus; }
-
     QString deviceName() { return m_deviceName; };
+    DeviceInfo deviceInfo();
+
     void setDeviceType(DeviceType deviceType);
     void setDeviceStatus(DeviceStatus deviceStatus);
     void setDeviceName(const QString &deviceName);
@@ -71,24 +73,6 @@ protected:
     virtual void acquireFeatureStop() = 0;
     virtual void acquireFeatureFail() = 0;
 
-    virtual void doingEnrollProcess(QByteArray feature);
-    virtual void doingIdentifyProcess(QByteArray feature);
-
-    virtual void enrollProcessFail(const QString &featureID){};
-    virtual void enrollProcessRetry();
-    virtual void enrollTemplateMerge() = 0;
-
-    virtual QString isFeatureEnrolled(QByteArray fpTemplate) = 0;
-    virtual QString identifyFeature(QByteArray feature, QStringList featureIDs) = 0;
-    virtual int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) = 0;
-
-    virtual void saveEnrollTemplateToCache(QByteArray enrollTemplate);
-    QByteArrayList enrollTemplatesFromCache();
-
-    virtual void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString()) = 0;
-    virtual void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString()) = 0;
-    virtual int needTemplatesCountForEnroll() = 0;
-
 private Q_SLOTS:
     void onNameLost(const QString &serviceName);
     void handleAcquiredFeature();
@@ -96,8 +80,8 @@ private Q_SLOTS:
 
 protected:
     void clearWatchedServices();
-    void internalStopEnroll();
-    void internalStopIdentify();
+    virtual void internalStopEnroll();
+    virtual void internalStopIdentify();
 
 private:
     void registerDBusObject();
@@ -106,33 +90,42 @@ private:
 
     void onEnrollStart(const QDBusMessage &message, const QString &extraInfo);
     void onEnrollStop(const QDBusMessage &message);
+    void onBioEnrollStart(const QDBusMessage &dbusMessage);
+    void onUKeyEnrollStart(const QDBusMessage &dbusMessage, QJsonValue jsonValue);
+
     void onIdentifyStart(const QDBusMessage &message, const QString &value);
     void onIdentifyStop(const QDBusMessage &message);
+    void onBioIdentifyStart(const QDBusMessage &dbusMessage);
+    void onUKeyIdentifyStart(const QDBusMessage &dbusMessage, QJsonValue jsonValue);
+
+    virtual void doingEnrollProcess(QByteArray feature){};
+    virtual void doingIdentifyProcess(QByteArray feature){};
+
+    virtual void doingUKeyEnrollStart(const QString &pin, bool rebinding = false){};
+    virtual void doingUKeyIdentifyStart(const QString &pin){};
 
 Q_SIGNALS:
     void retry();
 
 protected:
-    QString m_deviceID;
     QString m_deviceDriver;
+    QSharedPointer<AuthDeviceAdaptor> m_dbusAdaptor;
+    bool m_doAcquire = true;
+    QStringList m_identifyIDs;
+    QByteArrayList m_enrollTemplates;
+    QSharedPointer<QFutureWatcher<QByteArray>> m_futureWatcher;
+    QString m_pin;
+
+private:
+    QString m_deviceID;
     int m_deviceType;
     int m_deviceStatus;
     QString m_deviceName;
     QString m_idVendor;
     QString m_idProduct;
     QDBusObjectPath m_objectPath;
-    QDBusServiceWatcher *m_serviceWatcher;
-    AuthDeviceAdaptor *m_dbusAdaptor;
+    QSharedPointer<QDBusServiceWatcher> m_serviceWatcher;
 
-    bool m_doAcquire = true;
-    bool m_doIdentify = true;
-    bool m_doEnroll = true;
-    QStringList m_identifyIDs;
-    QByteArrayList m_enrollTemplates;
-
-    QFutureWatcher<QByteArray> *m_futureWatcher;
-
-private:
     /**
      * 用于注册com.kylinsec.Kiran.AuthDevice.Device服务时的编号
      * 在生成AuthDevice对象，注册dbus服务成功后，数值加1

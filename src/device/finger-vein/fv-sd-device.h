@@ -14,7 +14,8 @@
 
 #pragma once
 #include <QFutureWatcher>
-#include "device/auth-device.h"
+#include "device/bio-device.h"
+#include <QSharedPointer>
 
 namespace Kiran
 {
@@ -25,7 +26,7 @@ enum ExtractFeatureMode
 };
 
 struct DriverLib;
-class FVSDDevice : public AuthDevice
+class FVSDDevice : public BioDevice
 {
     Q_OBJECT
 public:
@@ -53,13 +54,14 @@ private:
 
     QByteArray getFeatureFromImage(QByteArray image, ExtractFeatureMode mode);
 
-    int needTemplatesCountForEnroll() override;
+    int mergeTemplateCount() override;
     int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
     void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString()) override;
     void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString()) override;
 
 private:
-    DriverLib *m_driverLib;
+    QSharedPointer<DriverLib> m_driverLib;
+
     Handle m_libProcessHandle;
     Handle m_libComHandle;
 };

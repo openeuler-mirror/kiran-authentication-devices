@@ -12,47 +12,45 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 
-#include "fv-sd-context.h"
+#include "ukey-ft-context.h"
 #include <qt5-log-i.h>
-#include "device/finger-vein/fv-sd-device.h"
+#include "device/ukey/ukey-ft-device.h"
 #include "utils.h"
 
 namespace Kiran
 {
-FVSDContext::FVSDContext(QObject* parent)
+UKeyFTContext::UKeyFTContext(QObject* parent)
     : Context{parent}
 {
 }
 
-//TODO:createDevice 流程类似，考虑优化，减少重复代码
-// fp-zk-context 需要管理多个so，可以生成不同 so的设备
-AuthDevice* FVSDContext::createDevice(const QString& idVendor, const QString& idProduct)
+AuthDevice* UKeyFTContext::createDevice(const QString& idVendor, const QString& idProduct)
 {
-    auto sdDevice = new FVSDDevice();
-    if (!Utils::driverEnabled(sdDevice->deviceDriver()))
+    auto ftDevice = new UKeyFTDevice();
+    if (!Utils::driverEnabled(ftDevice->deviceDriver()))
     {
         KLOG_INFO() << QString("driver %1 is disabled! device %2:%3 can't be used")
-                           .arg(sdDevice->deviceDriver())
+                           .arg(ftDevice->deviceDriver())
                            .arg(idVendor)
                            .arg(idProduct);
         return nullptr;
     }
-    if (sdDevice->init())
+    if (ftDevice->init())
     {
         QString deviceName = Utils::getDeviceName(idVendor, idProduct);
-        if(deviceName.isEmpty())
+        if (deviceName.isEmpty())
         {
-            deviceName = "SAINT DEEM";
+            deviceName = "Feitian Technologies";
         }
-        sdDevice->setDeviceName(deviceName);
-        sdDevice->setDeviceInfo(idVendor, idProduct);
-        m_deviceMap.insert(sdDevice->deviceID(), sdDevice);
-        return sdDevice;
+        ftDevice->setDeviceName(deviceName);
+        ftDevice->setDeviceInfo(idVendor, idProduct);
+        m_deviceMap.insert(ftDevice->deviceID(), ftDevice);
+        return ftDevice;
     }
     else
     {
         KLOG_ERROR() << QString("device %1:%2 init failed!").arg(idVendor).arg(idProduct);
-        sdDevice->deleteLater();
+        ftDevice->deleteLater();
         return nullptr;
     }
 }

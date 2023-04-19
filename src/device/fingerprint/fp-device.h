@@ -13,11 +13,11 @@
  */
 
 #pragma once
-#include "device/auth-device.h"
+#include "device/bio-device.h"
 
 namespace Kiran
 {
-class FPDevice : public AuthDevice
+class FPDevice : public BioDevice
 {
 public:
     explicit FPDevice(QObject *parent = nullptr);

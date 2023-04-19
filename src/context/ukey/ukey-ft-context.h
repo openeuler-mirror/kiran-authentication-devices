@@ -12,31 +12,16 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 #pragma once
-#include "kiran-auth-device-i.h"
-#include <QString>
+#include "context/context.h"
 
 namespace Kiran
 {
-#define ZK_ID_VENDOR "1b55"
-#define SD_ID_VENDOR "05e3"
-#define FT_ID_VENDOR "096e"
-
-static const struct ThirdPartyDeviceSupported
+class AuthDevice;
+class UKeyFTContext : public Context
 {
-    //设备类型，必填
-    DeviceType deviceType;
-    //生产商ID，必填
-    QString idVendor;
-    //产品ID，必填
-    QString idProduct;
-    //驱动路径，选填
-    QString driverPath;
-    //描述信息，选填
-    QString description;
-}ThirdPartyDeviceSupportedTable[] = {
-    {DEVICE_TYPE_FingerPrint,"1b55","0120","","ZK"},
-    {DEVICE_TYPE_FingerVein,"05e3","0608","","SD"},
-    {DEVICE_TYPE_UKey,"096e","0309","","FT"}
+public:
+    explicit UKeyFTContext(QObject *parent = nullptr);
+    AuthDevice* createDevice(const QString& idVendor, const QString& idProduct) override;
 };
 
-}
+}  // namespace Kiran

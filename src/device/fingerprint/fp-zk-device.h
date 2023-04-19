@@ -14,6 +14,7 @@
 #pragma once
 
 #include <QFutureWatcher>
+#include <QSharedPointer>
 #include "auth-enum.h"
 #include "fp-device.h"
 
@@ -39,8 +40,8 @@ private:
     void acquireFeatureStop() override;
     void acquireFeatureFail() override;
     void enrollTemplateMerge() override;
-    int needTemplatesCountForEnroll() override;
-    QString isFeatureEnrolled(QByteArray fpTemplate) override;
+    int mergeTemplateCount() override;
+
     void notifyEnrollProcess(EnrollProcess process, const QString& featureID = QString()) override;
     void notifyIdentifyProcess(IdentifyProcess process, const QString& featureID = QString()) override;
 
@@ -63,6 +64,6 @@ private:
 private:
     Handle m_libHandle;
     Handle m_hDBCache;
-    DriverLib* m_driverLib;
+    QSharedPointer<DriverLib> m_driverLib;
 };
 }  // namespace Kiran

@@ -93,7 +93,9 @@ enum IdentifyProcess
     // 匹配
     IDENTIFY_PROCESS_MACTCH,
     // 不匹配
-    IDENTIFY_PROCESS_NO_MATCH
+    IDENTIFY_PROCESS_NO_MATCH,
+    // PIN码不正确
+    IDENTIFY_PROCESS_PIN_INCORRECT
 };
 
 }  // namespace Kiran
