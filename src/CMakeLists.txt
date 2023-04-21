@@ -69,6 +69,7 @@ target_link_libraries(${PROJECT_NAME}
                         Qt5::DBus
                         Qt5::Sql
                         Qt5::Concurrent
+                        ${CMAKE_DL_LIBS}
                         )
 
 target_link_directories(${PROJECT_NAME} PRIVATE
