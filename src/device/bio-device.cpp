@@ -14,14 +14,71 @@
 
 #include "bio-device.h"
 #include <qt5-log-i.h>
+#include <QtConcurrent>
+#include "feature-db.h"
+#include "auth_device_adaptor.h"
+
 namespace Kiran
 {
-BioDevice::BioDevice(QObject *parent) : AuthDevice{parent}
+#define TEMPLATE_MAX_NUMBER 1000
+
+BioDevice::BioDevice(QObject *parent) : AuthDevice{parent},
+                                        m_futureWatcher(nullptr)
 {
+    initFutureWatcher();
 }
 
 BioDevice::~BioDevice()
 {
+}
+
+void BioDevice::doingEnrollStart(const QString &extraInfo)
+{
+    KLOG_DEBUG() << "biological information enroll start";
+    // 获取当前保存的特征模板，判断是否达到最大数目
+    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct);
+    if (saveList.count() == TEMPLATE_MAX_NUMBER)
+    {
+        QString message = tr("feature has reached the upper limit of %1").arg(TEMPLATE_MAX_NUMBER);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        KLOG_ERROR() << message;
+        internalStopEnroll();
+        return;
+    }
+
+    auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
+    m_futureWatcher->setFuture(future);
+}
+
+void BioDevice::doingIdentifyStart(const QString &value)
+{
+    KLOG_DEBUG() << "biological information identify start";
+    auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
+    m_futureWatcher->setFuture(future);
+}
+
+void BioDevice::internalStopEnroll()
+{
+    if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
+    {
+        acquireFeatureStop();
+        m_enrollTemplates.clear();
+        setDeviceStatus(DEVICE_STATUS_IDLE);
+        clearWatchedServices();
+        KLOG_DEBUG() << QString("device type:%1,internal enroll stop").arg(deviceType());
+    }
+}
+
+void BioDevice::internalStopIdentify()
+{
+    if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
+    {
+        acquireFeatureStop();
+        m_identifyIDs.clear();
+        setDeviceStatus(DEVICE_STATUS_IDLE);
+        clearWatchedServices();
+        KLOG_DEBUG() << QString("device type:%1,internal identify stop").arg(deviceType());
+    }
 }
 
 void BioDevice::doingEnrollProcess(QByteArray feature)
@@ -45,7 +102,7 @@ void BioDevice::doingEnrollProcess(QByteArray feature)
     else if (templatesCount < mergeTemplateCount())
     {
         // 判断录入时是否录的是同一根手指
-        int matchResult = templateMatch(m_enrollTemplates.value(0), feature);
+        int matchResult = enrollTemplateMatch(m_enrollTemplates.value(0), feature);
         if (matchResult == GENERAL_RESULT_OK)
         {
             saveEnrollTemplateToCache(feature);
@@ -76,6 +133,29 @@ void BioDevice::doingIdentifyProcess(QByteArray feature)
 
     internalStopIdentify();
 }
+
+void BioDevice::handleAcquiredFeature()
+{
+    QByteArray feature = m_futureWatcher->result();
+    if (feature.isEmpty())
+    {
+        acquireFeatureFail();
+        return;
+    }
+
+    switch (deviceStatus())
+    {
+    case DEVICE_STATUS_DOING_ENROLL:
+        doingEnrollProcess(m_futureWatcher->result());
+        break;
+    case DEVICE_STATUS_DOING_IDENTIFY:
+        doingIdentifyProcess(m_futureWatcher->result());
+        break;
+    default:
+        break;
+    }
+}
+
 QByteArrayList BioDevice::enrollTemplatesFromCache()
 {
     return m_enrollTemplates;
@@ -99,6 +179,19 @@ void BioDevice::enrollProcessRetry()
 QString BioDevice::isFeatureEnrolled(QByteArray fpTemplate)
 {
     return identifyFeature(fpTemplate, QStringList());
+}
+
+void BioDevice::initFutureWatcher()
+{
+    m_futureWatcher = QSharedPointer<QFutureWatcher<QByteArray>>(new QFutureWatcher<QByteArray>(this));
+    connect(m_futureWatcher.data(), &QFutureWatcher<QByteArray>::finished, this, &BioDevice::handleAcquiredFeature);
+    connect(this, &AuthDevice::retry, this, &BioDevice::handleRetry);
+}
+
+void BioDevice::handleRetry()
+{
+    auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
+    m_futureWatcher->setFuture(future);
 }
 
 }  // namespace Kiran

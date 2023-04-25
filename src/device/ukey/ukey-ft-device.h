@@ -31,29 +31,23 @@ public:
     ~UKeyFTDevice();
 
     bool initDevice() override;
-    BDriver *getDriver() override;
 
 private:
-    void doingUKeyEnrollStart(const QString &pin, bool rebinding = false) override;
-    void doingUKeyIdentifyStart(const QString &pin) override;
-
+    void doingEnrollStart(const QString &extraInfo) override;
+    void doingIdentifyStart(const QString &value) override;
+    
     void internalStopEnroll() override;
     void internalStopIdentify() override;
 
     void identifyKeyFeature(QByteArray keyFeature);
-
-    bool isExistPublicKey();
-    void bindingCurrentUser();
+    
+    void bindingUKey();
     ECCPUBLICKEYBLOB genKeyPair();
-
+    bool isExistPublicKey();
     bool isExistsApplication(const QString &appName);
 
     void notifyUKeyEnrollProcess(EnrollProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
     void notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
-
-    QByteArray acquireFeature() override;
-    void acquireFeatureStop() override;
-    void acquireFeatureFail() override;
 
 private:
     Handle m_libHandle;
@@ -61,7 +55,7 @@ private:
     HAPPLICATION m_appHandle;
     HCONTAINER m_containerHandle;
     ULONG m_retryCount = 1000000;
-
+    QString m_pin;
     QSharedPointer<UKeySKFDriver> m_driver;
 };
 

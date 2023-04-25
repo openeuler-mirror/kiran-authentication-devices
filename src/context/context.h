@@ -24,14 +24,10 @@ class Context : public QObject
     Q_OBJECT
 public:
     explicit Context(QObject *parent = nullptr);
-
-    QString getName();
-    virtual AuthDevice *createDevice(const QString &idVendor, const QString &idProduct);
+    virtual AuthDevice *createDevice(const QString &idVendor, const QString &idProduct) = 0;
     virtual QList<AuthDevice *> getDevices() { return m_deviceMap.values(); };
-    QString getSoPath() { return m_soPath; };
 
 protected:
-    QString m_soPath;
     QMap<QString, AuthDevice *> m_deviceMap;
     AuthDevice *m_device;
 };

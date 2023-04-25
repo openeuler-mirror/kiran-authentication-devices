@@ -21,4 +21,9 @@ FPBuiltInContext::FPBuiltInContext(QObject *parent)
 {
 }
 
+AuthDevice* FPBuiltInContext::createDevice(const QString& idVendor, const QString& idProduct) 
+{
+    return nullptr;
+}
+
 }  // namespace Kiran

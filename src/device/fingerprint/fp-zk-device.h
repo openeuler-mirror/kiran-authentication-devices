@@ -31,7 +31,6 @@ public:
     ~FPZKDevice();
 
     bool initDevice() override;
-    BDriver* getDriver() override;
 
 private:
     bool loadLib();
@@ -40,7 +39,6 @@ private:
     void acquireFeatureStop() override;
     void acquireFeatureFail() override;
     void enrollTemplateMerge() override;
-    int mergeTemplateCount() override;
 
     void notifyEnrollProcess(EnrollProcess process, const QString& featureID = QString()) override;
     void notifyIdentifyProcess(IdentifyProcess process, const QString& featureID = QString()) override;
@@ -53,7 +51,7 @@ private:
                              QByteArray fpTemplate3);
 
     // 对比两枚指纹是否匹配
-    int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
+    int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
 
     QString identifyFeature(QByteArray fpTemplate, QStringList featureIDs) override;
 

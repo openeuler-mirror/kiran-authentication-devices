@@ -118,6 +118,7 @@ FVSDDevice::FVSDDevice(QObject *parent) : BioDevice{parent},
 {
     setDeviceType(DEVICE_TYPE_FingerVein);
     setDeviceDriver(SD_FV_DRIVER_LIB);
+    setMergeTemplateCount(TEMPLATE_FV_NUM);
 }
 
 FVSDDevice::~FVSDDevice()
@@ -468,17 +469,7 @@ QByteArray FVSDDevice::getFeatureFromImage(QByteArray image, ExtractFeatureMode 
     return QByteArray();
 }
 
-BDriver *FVSDDevice::getDriver()
-{
-    return nullptr;
-}
-
-int FVSDDevice::mergeTemplateCount()
-{
-    return TEMPLATE_FV_NUM;
-}
-
-int FVSDDevice::templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
+int FVSDDevice::enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
 {
     /**
      * NOTE:
@@ -497,7 +488,6 @@ void FVSDDevice::notifyEnrollProcess(EnrollProcess process, const QString &featu
     case ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("Finger vein image not obtained");
         Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_RETRY, message);
-        KLOG_DEBUG() << message;
         break;
     case ENROLL_PROCESS_PASS:
         message = tr("Partial finger vein feature entry");

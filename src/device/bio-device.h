@@ -22,26 +22,50 @@ class BioDevice : public AuthDevice
 public:
     explicit BioDevice(QObject *parent = nullptr);
     ~BioDevice();
+    int mergeTemplateCount() { return m_mergeTemplateCount; };
+    void setMergeTemplateCount(int count) { m_mergeTemplateCount = count; };
 
 protected:
-    void doingEnrollProcess(QByteArray feature) override;
-    void doingIdentifyProcess(QByteArray feature) override;
-
-    virtual void enrollProcessRetry();
+    virtual QByteArray acquireFeature() = 0;
+    virtual void acquireFeatureStop() = 0;
+    virtual void acquireFeatureFail() = 0;
 
     virtual void enrollTemplateMerge() = 0;
-    virtual int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) = 0;
+    virtual int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) = 0;
     virtual QString identifyFeature(QByteArray feature, QStringList featureIDs) = 0;
 
-    virtual int mergeTemplateCount() = 0;
+    void internalStopEnroll() override;
+    void internalStopIdentify() override;
+
+    virtual void enrollProcessRetry();
+    //TODO:优化通知
     virtual void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString()) = 0;
     virtual void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString()) = 0;
 
     QByteArrayList enrollTemplatesFromCache();
     virtual void saveEnrollTemplateToCache(QByteArray enrollTemplate);
 
+private Q_SLOTS:
+    void handleAcquiredFeature();
+
 private:
+    void doingEnrollStart(const QString &extraInfo) override;
+    void doingIdentifyStart(const QString &value) override;
+
+    void doingEnrollProcess(QByteArray feature);
+    void doingIdentifyProcess(QByteArray feature);
+
     virtual QString isFeatureEnrolled(QByteArray fpTemplate);
+    void initFutureWatcher();
+    void handleRetry();
+
+protected:
+    bool m_doAcquire = true;
+    QByteArrayList m_enrollTemplates;
+    QSharedPointer<QFutureWatcher<QByteArray>> m_futureWatcher;
+
+private:
+    int m_mergeTemplateCount;
 };
 
 }  // namespace Kiran

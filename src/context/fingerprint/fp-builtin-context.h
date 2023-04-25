@@ -21,6 +21,7 @@ class FPBuiltInContext : public Context
 {
 public:
     explicit FPBuiltInContext(QObject *parent = nullptr);
+    AuthDevice* createDevice(const QString& idVendor, const QString& idProduct) override;
 };
 
 }  // namespace Kiran

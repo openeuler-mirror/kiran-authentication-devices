@@ -65,7 +65,6 @@ QJsonValue getValueFromJsonString(const QString& json, const QString& key)
     QJsonDocument jsonDoc = QJsonDocument::fromJson(json.toLocal8Bit().data());
     if (jsonDoc.isEmpty())
     {
-        KLOG_DEBUG() << "invalid value";
         return QJsonValue();
     }
     QJsonObject jsonObject = jsonDoc.object();
