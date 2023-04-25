@@ -24,9 +24,9 @@ UKeyFTContext::UKeyFTContext(QObject* parent)
 {
 }
 
-AuthDevice* UKeyFTContext::createDevice(const QString& idVendor, const QString& idProduct)
+AuthDevicePtr UKeyFTContext::createDevice(const QString& idVendor, const QString& idProduct)
 {
-    auto ftDevice = new UKeyFTDevice();
+    auto ftDevice =  QSharedPointer<UKeyFTDevice>(new UKeyFTDevice()) ;
     if (!Utils::driverEnabled(ftDevice->deviceDriver()))
     {
         KLOG_INFO() << QString("driver %1 is disabled! device %2:%3 can't be used")

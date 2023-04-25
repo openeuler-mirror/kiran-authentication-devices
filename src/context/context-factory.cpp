@@ -54,10 +54,10 @@ void ContextFactory::init()
     m_ukeyFTContext = QSharedPointer<UKeyFTContext>(new UKeyFTContext());
 }
 
-AuthDevice* ContextFactory::createDevice(const QString& idVendor, const QString& idProduct)
+AuthDevicePtr ContextFactory::createDevice(const QString& idVendor, const QString& idProduct)
 {
     // TODO:先从内置默认支持的设备开始搜索，最后才搜索第三方设备
-    AuthDevice* device = nullptr;
+    AuthDevicePtr device = nullptr;
     const int count = sizeof(ThirdPartyDeviceSupportedTable) / sizeof(ThirdPartyDeviceSupportedTable[0]);
     for (int i = 0; i < count; i++)
     {
@@ -103,7 +103,7 @@ bool ContextFactory::isDeviceSupported(const QString& idVendor, const QString& i
 }
 
 // TODO:create行为类似，考虑优化
-AuthDevice* ContextFactory::createFingerPrintDevice(const QString& idVendor, const QString& idProduct)
+AuthDevicePtr ContextFactory::createFingerPrintDevice(const QString& idVendor, const QString& idProduct)
 {
     if (idVendor == ZK_ID_VENDOR)
     {
@@ -115,7 +115,7 @@ AuthDevice* ContextFactory::createFingerPrintDevice(const QString& idVendor, con
     };
 }
 
-AuthDevice* ContextFactory::createFingerVeinDevice(const QString& idVendor, const QString& idProduct)
+AuthDevicePtr ContextFactory::createFingerVeinDevice(const QString& idVendor, const QString& idProduct)
 {
     if (idVendor == SD_ID_VENDOR)
     {
@@ -125,7 +125,7 @@ AuthDevice* ContextFactory::createFingerVeinDevice(const QString& idVendor, cons
         return nullptr;
 }
 
-AuthDevice* ContextFactory::createUKeyDevice(const QString& idVendor, const QString& idProduct)
+AuthDevicePtr ContextFactory::createUKeyDevice(const QString& idVendor, const QString& idProduct)
 {
     if (idVendor == FT_ID_VENDOR)
     {
@@ -146,9 +146,9 @@ void ContextFactory::DestoryContext(Context* context)
 {
 }
 
-QList<AuthDevice*> ContextFactory::getDevices()
+QList<AuthDevicePtr> ContextFactory::getDevices()
 {
-    QList<AuthDevice*> devices;
+    QList<AuthDevicePtr> devices;
     devices << m_fpZKContext->getDevices()
             << m_fpBuiltInContext->getDevices();
     return devices;

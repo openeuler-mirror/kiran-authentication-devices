@@ -18,7 +18,7 @@
 #include <QUuid>
 #include <QtConcurrent>
 #include "auth_device_adaptor.h"
-#include  "feature-db.h"
+#include "feature-db.h"
 #include "kiran-auth-device-i.h"
 #include "polkit-proxy.h"
 #include "utils.h"
@@ -27,9 +27,7 @@ namespace Kiran
 {
 size_t AuthDevice::m_deviceObjectNum = 0;
 
-AuthDevice::AuthDevice(QObject* parent) : QObject(parent),
-                                          m_dbusAdaptor(nullptr),
-                                          m_serviceWatcher(nullptr)
+AuthDevice::AuthDevice(QObject* parent) : QObject(parent)
 {
 }
 
@@ -123,7 +121,9 @@ void AuthDevice::setDeviceDriver(const QString& deviceDriver)
         driverName = deviceDriver.mid(3, deviceDriver.indexOf(".so") - 3);
     }
     else
+    {
         driverName = deviceDriver;
+    }
     m_deviceDriver = driverName;
 }
 

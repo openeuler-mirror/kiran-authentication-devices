@@ -12,18 +12,36 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 #pragma once
-#include "context/context.h"
-#include <QPointer>
 
+#include <libudev.h>
+#include <QObject>
+#include <QSharedPointer>
+#include <QSocketNotifier>
+#include "auth-enum.h"
 
 namespace Kiran
 {
-class AuthDevice;
-class FPZKContext : public Context
+class UdevMonitor : public QObject
 {
+    Q_OBJECT
 public:
-    explicit FPZKContext(QObject *parent = nullptr);
-    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct) override;  
-};
+    explicit UdevMonitor(QObject *parent = nullptr);
+    ~UdevMonitor();
 
+private Q_SLOTS:
+    void onSocketNotifierRead(int socket);
+
+Q_SIGNALS:
+    void deviceAdded(DeviceInfo deviceInfo);
+    void deviceDeleted();
+
+private:
+    void init();
+
+private:
+    udev *m_udev;
+    udev_monitor *m_monitor;
+    QSharedPointer<QSocketNotifier> m_socketNotifierRead;
+    int m_monitorFD;
+};
 }  // namespace Kiran

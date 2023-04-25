@@ -26,9 +26,9 @@ FVSDContext::FVSDContext(QObject* parent)
 
 //TODO:createDevice 流程类似，考虑优化，减少重复代码
 // fp-zk-context 需要管理多个so，可以生成不同 so的设备
-AuthDevice* FVSDContext::createDevice(const QString& idVendor, const QString& idProduct)
+AuthDevicePtr FVSDContext::createDevice(const QString& idVendor, const QString& idProduct)
 {
-    auto sdDevice = new FVSDDevice();
+    auto sdDevice = QSharedPointer<FVSDDevice>(new FVSDDevice());
     if (!Utils::driverEnabled(sdDevice->deviceDriver()))
     {
         KLOG_INFO() << QString("driver %1 is disabled! device %2:%3 can't be used")

@@ -14,16 +14,19 @@
 
 #pragma once
 
-#include <QString>
 #include <QJsonValue>
+#include <QString>
+#include "auth-enum.h"
 
 namespace Kiran
 {
 namespace Utils
 {
+QList<DeviceInfo> enumerateDevices();
+
 QString getDeviceName(const QString& idVendor, const QString& idProduct);
 
-QJsonValue getValueFromJsonString(const QString &json,const QString &key);
+QJsonValue getValueFromJsonString(const QString& json, const QString& key);
 
 QStringList getDriverBlackList();
 

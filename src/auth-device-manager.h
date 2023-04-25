@@ -22,6 +22,7 @@
 #include <QSocketNotifier>
 #include <QTimer>
 #include "auth-enum.h"
+#include "udev-monitor.h"
 
 class AuthDeviceManagerAdaptor;
 
@@ -52,7 +53,6 @@ public Q_SLOTS:
     void Remove(const QString &feature_id);
 
 private Q_SLOTS:
-    void handleSocketNotifierRead(int socket);
     void handleDeviceAdded(const DeviceInfo &usbInfo);
     void handleDeviceDeleted();
     void handleDeviceReCreate();
@@ -60,11 +60,6 @@ private Q_SLOTS:
 
 private:
     void init();
-    void initDeviceMonitor(struct udev *udev);
-    QList<DeviceInfo> enumerateDevices(struct udev *udev);
-    void processDevice(struct udev_device *dev);
-    void deviceSimpleInfo(struct udev_device *dev);
-
     void onRemove(const QDBusMessage &message, const QString &feature_id);
     void onSetEnableDriver(const QDBusMessage &message, const QString &driver_name, bool enable);
 
@@ -74,14 +69,10 @@ Q_SIGNALS:
 
 private:
     static AuthDeviceManager *m_instance;
-    QSharedPointer<udev> m_udev;
-    QSharedPointer<udev_monitor> m_monitor;
-
-    int m_fd;
+    QSharedPointer<UdevMonitor> m_udevMonitor;
     QSharedPointer<AuthDeviceManagerAdaptor> m_dbusAdaptor;
-    QSharedPointer<QSocketNotifier> m_socketNotifierRead;
     // 总线 -- AuthDevice对象对应
-    QMap<QString, AuthDevice *> m_deviceMap;
+    QMap<QString, QSharedPointer<AuthDevice>> m_deviceMap;
     QSharedPointer<ContextFactory> m_contextFactory;
     QTimer m_timer;
 

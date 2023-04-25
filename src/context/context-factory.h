@@ -14,8 +14,8 @@
 #pragma once
 
 #include <QObject>
-#include "context.h"
 #include <QSharedPointer>
+#include "context.h"
 
 namespace Kiran
 {
@@ -33,8 +33,8 @@ private:
 
 public:
     static ContextFactory* instance();
-    AuthDevice* createDevice(const QString& idVendor, const QString& idProduct);
-    QList<AuthDevice*> getDevices();
+    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct);
+    QList<AuthDevicePtr> getDevices();
 
     virtual Context* CreateContext();
     void DestoryContext(Context* context);
@@ -42,9 +42,9 @@ public:
 
 private:
     void init();
-    AuthDevice* createFingerPrintDevice(const QString& idVendor, const QString& idProduct);
-    AuthDevice* createFingerVeinDevice(const QString& idVendor, const QString& idProduct);
-    AuthDevice* createUKeyDevice(const QString& idVendor, const QString& idProduct);
+    AuthDevicePtr createFingerPrintDevice(const QString& idVendor, const QString& idProduct);
+    AuthDevicePtr createFingerVeinDevice(const QString& idVendor, const QString& idProduct);
+    AuthDevicePtr createUKeyDevice(const QString& idVendor, const QString& idProduct);
 
 private:
     QStringList m_idVendorList;

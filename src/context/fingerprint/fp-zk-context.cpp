@@ -26,12 +26,12 @@ FPZKContext::FPZKContext(QObject* parent)
 }
 
 // fp-zk-context 需要管理多个so，可以生成不同 so的设备
-AuthDevice* FPZKContext::createDevice(const QString& idVendor, const QString& idProduct)
+AuthDevicePtr FPZKContext::createDevice(const QString& idVendor, const QString& idProduct)
 {
     /**
      * NOTE:创建对象后，读取配置文件，判断驱动是否开启，再判断是否初始化该设备
      */
-    auto zkDevice = new FPZKDevice();
+    auto zkDevice = QSharedPointer<FPZKDevice>(new FPZKDevice());
     if(!Utils::driverEnabled(zkDevice->deviceDriver()))
     {
         KLOG_INFO() << QString("driver %1 is disabled! device %2:%3 can't be used")
