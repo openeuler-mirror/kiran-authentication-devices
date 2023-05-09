@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -15,15 +15,11 @@
 
 #include <QObject>
 #include <QSharedPointer>
+#include <functional>
 #include "context.h"
 
 namespace Kiran
 {
-class FPZKContext;
-class FPBuiltInContext;
-class FVSDContext;
-class UKeyFTContext;
-
 class ContextFactory : public QObject
 {
     Q_OBJECT
@@ -32,25 +28,36 @@ private:
     explicit ContextFactory(QObject* parent = nullptr);
 
 public:
-    static ContextFactory* instance();
+    static ContextFactory* getInstance();
+
     AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct);
-    QList<AuthDevicePtr> getDevices();
 
-    virtual Context* CreateContext();
-    void DestoryContext(Context* context);
     bool isDeviceSupported(const QString& idVendor, const QString& idProduct);
+    void DestoryContext(Context* context);
 
-private:
-    void init();
-    AuthDevicePtr createFingerPrintDevice(const QString& idVendor, const QString& idProduct);
-    AuthDevicePtr createFingerVeinDevice(const QString& idVendor, const QString& idProduct);
-    AuthDevicePtr createUKeyDevice(const QString& idVendor, const QString& idProduct);
+    void registerContext(std::function<Context*()>);
+    void createContext();
 
 private:
     QStringList m_idVendorList;
-    QSharedPointer<FPZKContext> m_fpZKContext;
-    QSharedPointer<FPBuiltInContext> m_fpBuiltInContext;
-    QSharedPointer<FVSDContext> m_fvSDContext;
-    QSharedPointer<UKeyFTContext> m_ukeyFTContext;
+    QList<QSharedPointer<Context>> m_contexts;
+    QList<std::function<Context*()>> m_listContextFunc;
 };
+
+class ContextRegisterHelper
+{
+public:
+    ContextRegisterHelper(std::function<Context*()> func)
+    {
+        ContextFactory::getInstance()->registerContext(func);
+    }
+};
+
+/**
+ * 定义全局静态变量，利用全局静态变量在进程开始时创建（在main函数之前初始化）
+ * 将所有context子类构造函数注册到contextFactory单例对象中
+*/
+#define REGISTER_CONTEXT(className) \
+    static ContextRegisterHelper className##ObjectRegisterHelper([]() -> className* { return new className(); })
+
 }  // namespace Kiran

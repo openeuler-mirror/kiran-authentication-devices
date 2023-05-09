@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -191,7 +191,7 @@ CHECK_AUTH_WITH_2ARGS(AuthDeviceManager, SetEnableDriver, onSetEnableDriver, AUT
 void AuthDeviceManager::init()
 {
     m_dbusAdaptor = QSharedPointer<AuthDeviceManagerAdaptor>(new AuthDeviceManagerAdaptor(this));
-    m_contextFactory = QSharedPointer<ContextFactory>(ContextFactory::instance());
+    m_contextFactory = QSharedPointer<ContextFactory>(ContextFactory::getInstance());
     connect(&m_timer, &QTimer::timeout, this, &AuthDeviceManager::handleDeviceReCreate);
 
     QDBusConnection dbusConnection = QDBusConnection::systemBus();

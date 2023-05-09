@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -13,15 +13,17 @@
  */
 
 #include "fp-builtin-context.h"
-
+#include "context/context-factory.h"
 namespace Kiran
 {
-FPBuiltInContext::FPBuiltInContext(QObject *parent)
+REGISTER_CONTEXT(FPBuiltInContext);
+
+FPBuiltInContext::FPBuiltInContext(QObject* parent)
     : Context{parent}
 {
 }
 
-AuthDevicePtr FPBuiltInContext::createDevice(const QString& idVendor, const QString& idProduct) 
+AuthDevicePtr FPBuiltInContext::createDevice(const QString& idVendor, const QString& idProduct)
 {
     return nullptr;
 }
