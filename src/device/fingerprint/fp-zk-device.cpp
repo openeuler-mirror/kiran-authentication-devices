@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -134,6 +134,7 @@ FPZKDevice::FPZKDevice(QObject* parent)
 {
     setDeviceType(DEVICE_TYPE_FingerPrint);
     setDeviceDriver(FP_ZK_DRIVER_LIB);
+    setMergeTemplateCount(FP_ZK_MEGER_TEMPLATE_COUNT);
 }
 
 // 析构时对设备进行资源回收
@@ -300,6 +301,7 @@ QByteArray FPZKDevice::acquireFeature()
                  ret == ZKFP_ERR_FAIL ||
                  ret == ZKFP_ERR_TIMEOUT)
         {
+            KLOG_DEBUG() << "acquire fingerprint fail! ZKFP_ERR:" << ret;
             break;
         }
     }
@@ -361,7 +363,7 @@ QByteArray FPZKDevice::templateMerge(QByteArray fpTemplate1,
     return regTemplate;
 }
 
-int FPZKDevice::templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
+int FPZKDevice::enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
 {
     int score = 0;
     score = m_driverLib->ZKFPM_DBMatch(m_hDBCache,
@@ -396,7 +398,7 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
         for (int j = 0; j < saveList.count(); j++)
         {
             auto saveTemplate = saveList.value(j);
-            int ret = templateMatch(fpTemplate, saveTemplate);
+            int ret = enrollTemplateMatch(fpTemplate, saveTemplate);
             // 指纹已经存在，直接返回该指纹
             if (ret == GENERAL_RESULT_OK)
             {
@@ -413,11 +415,6 @@ bool FPZKDevice::saveFPrintTemplate(QByteArray fpTemplate, const QString& featur
     DeviceInfo deviceInfo = this->deviceInfo();
     bool save = FeatureDB::getInstance()->addFeature(featureID, fpTemplate, deviceInfo);
     return save;
-}
-
-BDriver* FPZKDevice::getDriver()
-{
-    return nullptr;
 }
 
 int FPZKDevice::getDevCount()
@@ -439,7 +436,7 @@ void FPZKDevice::enrollTemplateMerge()
     }
 
     // 合成后的指纹与先前录入的指纹进行匹配
-    int matchResult = templateMatch(m_enrollTemplates.value(0), regTemplate);
+    int matchResult = enrollTemplateMatch(m_enrollTemplates.value(0), regTemplate);
     if (matchResult == GENERAL_RESULT_OK)
     {
         QString featureID = QCryptographicHash::hash(regTemplate, QCryptographicHash::Md5).toHex();
@@ -459,11 +456,6 @@ void FPZKDevice::enrollTemplateMerge()
         notifyEnrollProcess(ENROLL_PROCESS_INCONSISTENT_FEATURE_AFTER_MERGED);
     }
     internalStopEnroll();
-}
-
-int FPZKDevice::mergeTemplateCount()
-{
-    return FP_ZK_MEGER_TEMPLATE_COUNT;
 }
 
 void FPZKDevice::notifyEnrollProcess(EnrollProcess process, const QString& featureID)

@@ -13,8 +13,8 @@
  */
 
 #pragma once
+#include <QMetaType>
 #include <QString>
-
 namespace Kiran
 {
 
@@ -23,7 +23,6 @@ namespace Kiran
 #define DATABASE_DIR "/usr/share/kiran-authentication-devices"
 #define DRIVER_BLACK_LIST_CONF "/etc/kiran-authentication-device/driver-blacklist.conf"
 #define DRIVERS_CONF "/etc/kiran-authentication-devices/drivers.conf"
-
 #define AUTH_USER_ADMIN "com.kylinsec.kiran.authentication.user-administration"
 
 struct DeviceInfo
@@ -99,3 +98,5 @@ enum IdentifyProcess
 };
 
 }  // namespace Kiran
+
+Q_DECLARE_METATYPE(Kiran::DeviceInfo);
