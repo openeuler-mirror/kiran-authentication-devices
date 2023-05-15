@@ -11,21 +11,37 @@
  *
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
+#pragma once
 
-#include "fp-builtin-context.h"
-#include "context/context-factory.h"
+#include <libudev.h>
+#include <QObject>
+#include <QSharedPointer>
+#include <QSocketNotifier>
+#include "auth-enum.h"
+
 namespace Kiran
 {
-REGISTER_CONTEXT(FPBuiltInContext);
-
-FPBuiltInContext::FPBuiltInContext(QObject* parent)
-    : Context{parent}
+class UdevMonitor : public QObject
 {
-}
+    Q_OBJECT
+public:
+    explicit UdevMonitor(QObject *parent = nullptr);
+    ~UdevMonitor();
 
-AuthDevicePtr FPBuiltInContext::createDevice(const QString& idVendor, const QString& idProduct)
-{
-    return nullptr;
-}
+private Q_SLOTS:
+    void onSocketNotifierRead(int socket);
 
+Q_SIGNALS:
+    void deviceAdded(DeviceInfo deviceInfo);
+    void deviceDeleted();
+
+private:
+    void init();
+
+private:
+    udev *m_udev;
+    udev_monitor *m_monitor;
+    QSharedPointer<QSocketNotifier> m_socketNotifierRead;
+    int m_monitorFD;
+};
 }  // namespace Kiran

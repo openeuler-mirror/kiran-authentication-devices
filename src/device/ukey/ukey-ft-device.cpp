@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -19,6 +19,7 @@
 #include "auth-enum.h"
 #include "auth_device_adaptor.h"
 #include "feature-db.h"
+#include "utils.h"
 
 namespace Kiran
 {
@@ -56,20 +57,28 @@ bool UKeyFTDevice::initDevice()
     m_devHandle = m_driver->connectDev();
     if (!m_devHandle)
     {
-        KLOG_DEBUG() << "";
         return false;
     }
 
     return true;
 }
 
-BDriver *UKeyFTDevice::getDriver()
+void UKeyFTDevice::doingEnrollStart(const QString &extraInfo)
 {
-    return nullptr;
-}
+    KLOG_DEBUG() << "ukey enrool  start";
+    QJsonValue ukeyValue = Utils::getValueFromJsonString(extraInfo, AUTH_DEVICE_JSON_KEY_UKEY);
+    auto jsonObject = ukeyValue.toObject();
+    m_pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
+    bool rebinding = jsonObject.value(AUTH_DEVICE_JSON_KEY_REBINDING).toBool();
+    if (m_pin.isEmpty())
+    {
+        QString message = tr("The pin code cannot be empty!");
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        KLOG_ERROR() << message;
+        internalStopEnroll();
+        return;
+    }
 
-void UKeyFTDevice::doingUKeyEnrollStart(const QString &pin, bool rebinding)
-{
     if (rebinding)
     {
         ULONG ulReval = m_driver->devAuth(m_devHandle);
@@ -82,7 +91,7 @@ void UKeyFTDevice::doingUKeyEnrollStart(const QString &pin, bool rebinding)
             {
                 FeatureDB::getInstance()->deleteFeature(id);
             }
-            bindingCurrentUser();
+            bindingUKey();
         }
         else
         {
@@ -91,12 +100,12 @@ void UKeyFTDevice::doingUKeyEnrollStart(const QString &pin, bool rebinding)
     }
     else
     {
-        bindingCurrentUser();
+        bindingUKey();
     }
     internalStopEnroll();
 }
 
-void UKeyFTDevice::bindingCurrentUser()
+void UKeyFTDevice::bindingUKey()
 {
     if (isExistPublicKey())
     {
@@ -105,35 +114,34 @@ void UKeyFTDevice::bindingCurrentUser()
     }
 
     ECCPUBLICKEYBLOB publicKey = genKeyPair();
-    if (publicKey.BitLen != 0)
+    if (publicKey.BitLen == 0)
     {
-        /**
-         * 存入PublicKey,生成FID，并返回FID，FID标识PublicKey
-         * 不用保存PublicKey和systemUser的关系,目前只有一个用户
-         */
-        QByteArray keyFeature;
-        QByteArray xCoordinateArray((char *)publicKey.XCoordinate, 64);
-        QByteArray yCoordinateArray((char *)publicKey.YCoordinate, 64);
-        keyFeature.append(publicKey.BitLen);
-        keyFeature.append(xCoordinateArray);
-        keyFeature.append(yCoordinateArray);
-        KLOG_DEBUG() << "keyFeature:" << keyFeature;
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_SAVE_FAIL);
+        return;
+    }
 
-        QString featureID = QCryptographicHash::hash(keyFeature, QCryptographicHash::Md5).toHex();
-        DeviceInfo deviceInfo = this->deviceInfo();
+    /**
+     * 存入PublicKey,生成FID，并返回FID，FID标识PublicKey
+     * 不用保存PublicKey和systemUser的关系,目前只有一个用户
+     */
+    QByteArray keyFeature;
+    QByteArray xCoordinateArray((char *)publicKey.XCoordinate, 64);
+    QByteArray yCoordinateArray((char *)publicKey.YCoordinate, 64);
+    keyFeature.append(publicKey.BitLen);
+    keyFeature.append(xCoordinateArray);
+    keyFeature.append(yCoordinateArray);
+    KLOG_DEBUG() << "keyFeature:" << keyFeature;
 
-        if (FeatureDB::getInstance()->addFeature(featureID, keyFeature, deviceInfo))
-        {
-            notifyUKeyEnrollProcess(ENROLL_PROCESS_SUCCESS, SAR_OK, featureID);
-        }
-        else
-        {
-            KLOG_DEBUG() << "save feature fail";
-            notifyUKeyEnrollProcess(ENROLL_PROCESS_SAVE_FAIL);
-        }
+    QString featureID = QCryptographicHash::hash(keyFeature, QCryptographicHash::Md5).toHex();
+    DeviceInfo deviceInfo = this->deviceInfo();
+
+    if (FeatureDB::getInstance()->addFeature(featureID, keyFeature, deviceInfo))
+    {
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_SUCCESS, SAR_OK, featureID);
     }
     else
     {
+        KLOG_DEBUG() << "save feature fail";
         notifyUKeyEnrollProcess(ENROLL_PROCESS_SAVE_FAIL);
     }
 }
@@ -210,8 +218,21 @@ bool UKeyFTDevice::isExistsApplication(const QString &appName)
     return false;
 }
 
-void UKeyFTDevice::doingUKeyIdentifyStart(const QString &pin)
+void UKeyFTDevice::doingIdentifyStart(const QString &value)
 {
+    KLOG_DEBUG() << "ukey identify start";
+    QJsonValue ukeyValue = Utils::getValueFromJsonString(value, AUTH_DEVICE_JSON_KEY_UKEY);
+    auto jsonObject = ukeyValue.toObject();
+    m_pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
+    if (m_pin.isEmpty())
+    {
+        QString message = tr("The pin code cannot be empty!");
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_RESULT_NOT_MATCH, message);
+        KLOG_ERROR() << message;
+        internalStopIdentify();
+        return;
+    }
+
     QList<QByteArray> saveList;
     DeviceInfo deviceInfo = this->deviceInfo();
     if (m_identifyIDs.isEmpty())
@@ -250,8 +271,7 @@ void UKeyFTDevice::internalStopEnroll()
     {
         m_driver->closeContainer(m_containerHandle);
         m_driver->closeApplication(m_appHandle);
-        acquireFeatureStop();
-        m_enrollTemplates.clear();
+        m_pin.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
         KLOG_DEBUG() << "stop Enroll";
@@ -264,8 +284,8 @@ void UKeyFTDevice::internalStopIdentify()
     {
         m_driver->closeContainer(m_containerHandle);
         m_driver->closeApplication(m_appHandle);
-        acquireFeatureStop();
         m_identifyIDs.clear();
+        m_pin.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
         KLOG_DEBUG() << "stopIdentify";
@@ -315,18 +335,6 @@ void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
     {
         notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_MACTCH);
     }
-}
-
-QByteArray UKeyFTDevice::acquireFeature()
-{
-    return QByteArray();
-}
-
-void UKeyFTDevice::acquireFeatureStop()
-{
-}
-void UKeyFTDevice::acquireFeatureFail()
-{
 }
 
 void UKeyFTDevice::notifyUKeyEnrollProcess(EnrollProcess process, ULONG error, const QString &featureID)

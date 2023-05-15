@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -14,8 +14,8 @@
 
 #pragma once
 #include <QFutureWatcher>
-#include "device/bio-device.h"
 #include <QSharedPointer>
+#include "device/bio-device.h"
 
 namespace Kiran
 {
@@ -32,36 +32,30 @@ class FVSDDevice : public BioDevice
 public:
     explicit FVSDDevice(QObject *parent = nullptr);
     ~FVSDDevice();
-
     bool initDevice() override;
-    BDriver *getDriver() override;
 
 private:
     bool loadLib();
-
-    void enrollTemplateMerge();
-    void saveEnrollTemplateToCache(QByteArray enrollTemplate) override;
 
     QByteArray acquireFeature() override;
     void acquireFeatureStop() override;
     void acquireFeatureFail() override;
 
+    int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
+    void enrollTemplateMerge() override;
+    void saveEnrollTemplateToCache(QByteArray enrollTemplate) override;
     void enrollProcessRetry() override;
 
     QString isFeatureEnrolled(QByteArray fpTemplate) override;
-
     QString identifyFeature(QByteArray feature, QStringList featureIDs) override;
 
-    QByteArray getFeatureFromImage(QByteArray image, ExtractFeatureMode mode);
-
-    int mergeTemplateCount() override;
-    int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
     void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString()) override;
     void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString()) override;
 
+    QByteArray getFeatureFromImage(QByteArray image, ExtractFeatureMode mode);
+
 private:
     QSharedPointer<DriverLib> m_driverLib;
-
     Handle m_libProcessHandle;
     Handle m_libComHandle;
 };

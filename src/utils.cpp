@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -18,14 +18,44 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
-#include "auth-enum.h"
+
 
 namespace Kiran
 {
 #define CONF_FILE_DISABLE_DRIVER_NAME "Disable/DriverName"
+#define SUBSYSTEM "usb"
 
 namespace Utils
 {
+QList<DeviceInfo> enumerateDevices()
+{
+    struct udev* udev;
+    udev = udev_new();
+    // 创建一个枚举器用于扫描已连接的设备
+    struct udev_enumerate* enumerate = udev_enumerate_new(udev);
+    udev_enumerate_add_match_subsystem(enumerate, SUBSYSTEM);
+    udev_enumerate_scan_devices(enumerate);
+    // 返回一个存储了设备所有属性信息的链表
+    struct udev_list_entry* devices = udev_enumerate_get_list_entry(enumerate);
+    struct udev_list_entry* entry;
+
+    QList<DeviceInfo> usbInfoList;
+    udev_list_entry_foreach(entry, devices)
+    {
+        const char* path = udev_list_entry_get_name(entry);
+        // 创建一个udev设备的映射
+        struct udev_device* dev = udev_device_new_from_syspath(udev, path);
+        DeviceInfo usbInfo;
+        usbInfo.idVendor = udev_device_get_sysattr_value(dev, "idVendor");
+        usbInfo.idProduct = udev_device_get_sysattr_value(dev, "idProduct");
+        usbInfo.busPath = udev_device_get_devnode(dev);
+        usbInfoList << usbInfo;
+    }
+
+    udev_enumerate_unref(enumerate);
+    udev_unref(udev);
+    return usbInfoList;
+}
 
 QString getDeviceName(const QString& idVendor, const QString& idProduct)
 {
@@ -65,7 +95,6 @@ QJsonValue getValueFromJsonString(const QString& json, const QString& key)
     QJsonDocument jsonDoc = QJsonDocument::fromJson(json.toLocal8Bit().data());
     if (jsonDoc.isEmpty())
     {
-        KLOG_DEBUG() << "invalid value";
         return QJsonValue();
     }
     QJsonObject jsonObject = jsonDoc.object();

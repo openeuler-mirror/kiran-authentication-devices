@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -15,17 +15,13 @@
 #include "context-factory.h"
 #include <qt5-log-i.h>
 #include <QMutex>
-#include "finger-vein/fv-sd-context.h"
-#include "fingerprint/fp-builtin-context.h"
-#include "fingerprint/fp-zk-context.h"
 #include "kiran-auth-device-i.h"
 #include "third-party-device.h"
-#include "ukey/ukey-ft-context.h"
 
 namespace Kiran
 {
 
-ContextFactory* ContextFactory::instance()
+ContextFactory* ContextFactory::getInstance()
 {
     static QMutex mutex;
     static QScopedPointer<ContextFactory> pInst;
@@ -40,50 +36,45 @@ ContextFactory* ContextFactory::instance()
     return pInst.data();
 }
 
+void ContextFactory::registerContext(std::function<Context*()> func)
+{
+    m_listContextFunc.append(func);
+}
+
+void ContextFactory::createContext()
+{
+    Q_FOREACH (auto func, m_listContextFunc)
+    {
+        m_contexts << QSharedPointer<Context>(func());
+    }
+}
+
 ContextFactory::ContextFactory(QObject* parent)
     : QObject{parent}
 {
-    init();
 }
 
-void ContextFactory::init()
+AuthDevicePtr ContextFactory::createDevice(const QString& idVendor, const QString& idProduct)
 {
-    m_fpZKContext = QSharedPointer<FPZKContext>(new FPZKContext());
-    m_fpBuiltInContext = QSharedPointer<FPBuiltInContext>(new FPBuiltInContext());
-    m_fvSDContext = QSharedPointer<FVSDContext>(new FVSDContext());
-    m_ukeyFTContext = QSharedPointer<UKeyFTContext>(new UKeyFTContext());
-}
-
-AuthDevice* ContextFactory::createDevice(const QString& idVendor, const QString& idProduct)
-{
-    // TODO:先从内置默认支持的设备开始搜索，最后才搜索第三方设备
-    AuthDevice* device = nullptr;
-    const int count = sizeof(ThirdPartyDeviceSupportedTable) / sizeof(ThirdPartyDeviceSupportedTable[0]);
-    for (int i = 0; i < count; i++)
+    if (m_contexts.count() == 0)
     {
-        const ThirdPartyDeviceSupported* thirdPartyDevice = ThirdPartyDeviceSupportedTable + i;
-        if ((thirdPartyDevice->idVendor == idVendor) && (thirdPartyDevice->idProduct == idProduct))
+        createContext();
+    }
+
+    // TODO:先从内置默认支持的设备开始搜索，最后才搜索第三方设备
+    AuthDevicePtr device = nullptr;
+    if (isDeviceSupported(idVendor, idProduct))
+    {
+        Q_FOREACH (auto context, m_contexts)
         {
-            switch (thirdPartyDevice->deviceType)
+            device = context->createDevice(idVendor, idProduct);
+            if (device != nullptr)
             {
-            case DEVICE_TYPE_FingerPrint:
-                device = createFingerPrintDevice(idVendor, idProduct);
-                break;
-            case DEVICE_TYPE_Face:
-                break;
-            case DEVICE_TYPE_FingerVein:
-                device = createFingerVeinDevice(idVendor, idProduct);
-                break;
-            case DEVICE_TYPE_UKey:
-                device = createUKeyDevice(idVendor, idProduct);
-                break;
-            default:
-                break;
+                return device;
             }
-            break;
         }
     }
-    return device;
+    return nullptr;
 }
 
 bool ContextFactory::isDeviceSupported(const QString& idVendor, const QString& idProduct)
@@ -102,56 +93,8 @@ bool ContextFactory::isDeviceSupported(const QString& idVendor, const QString& i
     return false;
 }
 
-// TODO:create行为类似，考虑优化
-AuthDevice* ContextFactory::createFingerPrintDevice(const QString& idVendor, const QString& idProduct)
-{
-    if (idVendor == ZK_ID_VENDOR)
-    {
-        return m_fpZKContext->createDevice(idVendor, idProduct);
-    }
-    else
-    {
-        return nullptr;
-    };
-}
-
-AuthDevice* ContextFactory::createFingerVeinDevice(const QString& idVendor, const QString& idProduct)
-{
-    if (idVendor == SD_ID_VENDOR)
-    {
-        return m_fvSDContext->createDevice(idVendor, idProduct);
-    }
-    else
-        return nullptr;
-}
-
-AuthDevice* ContextFactory::createUKeyDevice(const QString& idVendor, const QString& idProduct)
-{
-    if (idVendor == FT_ID_VENDOR)
-    {
-        return m_ukeyFTContext->createDevice(idVendor, idProduct);
-    }
-    else
-    {
-        return nullptr;
-    };
-}
-
-Context* ContextFactory::CreateContext()
-{
-    return nullptr;
-}
-
 void ContextFactory::DestoryContext(Context* context)
 {
-}
-
-QList<AuthDevice*> ContextFactory::getDevices()
-{
-    QList<AuthDevice*> devices;
-    devices << m_fpZKContext->getDevices()
-            << m_fpBuiltInContext->getDevices();
-    return devices;
 }
 
 }  // namespace Kiran

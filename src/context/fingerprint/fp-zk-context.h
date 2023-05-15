@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2020 ~ 2021 KylinSec Co., Ltd.
- * kiran-biometrics is licensed under Mulan PSL v2.
+ * kiran-authentication-devices is licensed under Mulan PSL v2.
  * You can use this software according to the terms and conditions of the Mulan PSL v2.
  * You may obtain a copy of Mulan PSL v2 at:
  *          http://license.coscl.org.cn/MulanPSL2
@@ -12,9 +12,8 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 #pragma once
-#include "context/context.h"
 #include <QPointer>
-
+#include "context/context.h"
 
 namespace Kiran
 {
@@ -22,8 +21,8 @@ class AuthDevice;
 class FPZKContext : public Context
 {
 public:
-    explicit FPZKContext(QObject *parent = nullptr);
-    AuthDevice* createDevice(const QString& idVendor, const QString& idProduct) override;  
+    explicit FPZKContext(QObject* parent = nullptr);
+    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct) override;
 };
 
 }  // namespace Kiran
