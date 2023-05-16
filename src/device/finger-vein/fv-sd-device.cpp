@@ -27,21 +27,21 @@
 namespace Kiran
 {
 
-#define SD_FV_TEMPLATE_NUM 6         // 注册登记模板时，需要采集的指静脉次数
-#define SD_ENROLL_TIME_OUT 300       /* 入录指静脉等待时间，单位秒*/
-#define SD_TEMPLATE_MAX_NUMBER 10000 /* 最大指纹模板数目 */
+#define SD_FV_TEMPLATE_NUM 6                                   // 注册登记模板时，需要采集的指静脉次数
+#define SD_ENROLL_TIME_OUT 300                                 /* 入录指静脉等待时间，单位秒*/
+#define SD_TEMPLATE_MAX_NUMBER 10000                           /* 最大指纹模板数目 */
 
 #define IMAGE_TIME_OUT 50                                      // 获取图像等待的时间,单位秒（即：超过这个时间没有检测到touch就返回）,经过简单测试该设备最大等待时间为50s
 #define IMAGE_ROI_WIDTH 500                                    // 图像宽度
 #define IMAGE_ROI_HEIGHT 200                                   // 图像高度
 #define IMAGE_SIZE (IMAGE_ROI_WIDTH * IMAGE_ROI_HEIGHT + 208)  // 图片大小
 
-#define FEATURE_SIZE 1024   // 指静脉特征值大小
-#define TEMPLATE_SIZE 6144  // 指静脉模板大小
+#define FEATURE_SIZE 1024                                      // 指静脉特征值大小
+#define TEMPLATE_SIZE 6144                                     // 指静脉模板大小
 
-#define TEMPLATE_FV_NUM 6  // 注册登记模板时，需要采集的指静脉次数
+#define TEMPLATE_FV_NUM 6                                      // 注册登记模板时，需要采集的指静脉次数
 
-#define SD_FV_DRIVER_LIB "sdfv"  // 该名称不是实际so名称，由于实际驱动由多个so组成，为了表示方便自定义了一个名称进行标识
+#define SD_FV_DRIVER_LIB "sdfv"                                // 该名称不是实际so名称，由于实际驱动由多个so组成，为了表示方便自定义了一个名称进行标识
 #define SD_FV_DRIVER_LIB_PROCESS "libTGFVProcessAPI.so"
 #define SD_FV_DRIVER_LIB_COM "libTGVM661JComAPI.so"
 #define SD_LICENSE_PATH "/usr/share/kiran-authentication-devices-sdk/sd/license.dat"
@@ -126,8 +126,10 @@ FVSDDevice::~FVSDDevice()
     if (!deviceID().isEmpty())
     {
         acquireFeatureStop();
-        KLOG_DEBUG() << "TGGetDevStatus():" << m_driverLib->TGGetDevStatus();
-        m_driverLib->TGCloseDev();
+        if (m_driverLib.data() != nullptr)
+        {
+            m_driverLib->TGCloseDev();
+        }
     }
 
     if (m_libComHandle)
@@ -403,43 +405,45 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
         }
     }
 
-    if (saveList.count() != 0)
+    if (saveList.count() == 0)
     {
-        QByteArray saveTempl;
-        Q_FOREACH (auto saveFeature, saveList)
-        {
-            saveTempl.append(saveFeature);
-        }
+        return QString();
+    }
 
-        int matchIndex = 0;
-        int matchScore = 0;
-        unsigned char updateTmpl[TEMPLATE_SIZE] = {0};  // 自我学习后的新模板
-        KLOG_DEBUG() << "saveList.count():" << saveList.count();
+    QByteArray saveTempl;
+    Q_FOREACH (auto saveFeature, saveList)
+    {
+        saveTempl.append(saveFeature);
+    }
 
-        int matchResult = m_driverLib->TGFeatureMatchTmpl1N((unsigned char *)feature.data(),
-                                                            (unsigned char *)saveTempl.data(),
-                                                            saveList.count(),
-                                                            &matchIndex,
-                                                            &matchScore,
-                                                            updateTmpl);
+    int matchIndex = 0;
+    int matchScore = 0;
+    unsigned char updateTmpl[TEMPLATE_SIZE] = {0};  // 自我学习后的新模板
+    KLOG_DEBUG() << "saveList.count():" << saveList.count();
 
-        // 存在更新的模板
-        // 在数据库中替换掉原来的模板，保持FeatureID不变
-        if (matchResult == GENERAL_RESULT_OK)
-        {
-            QByteArray matchedFeature = saveTempl.mid((matchIndex - 1) * TEMPLATE_SIZE, TEMPLATE_SIZE);
-            featureID = FeatureDB::getInstance()->getFeatureID(matchedFeature);
+    int matchResult = m_driverLib->TGFeatureMatchTmpl1N((unsigned char *)feature.data(),
+                                                        (unsigned char *)saveTempl.data(),
+                                                        saveList.count(),
+                                                        &matchIndex,
+                                                        &matchScore,
+                                                        updateTmpl);
 
-            QByteArray updateFeature((char *)updateTmpl, TEMPLATE_SIZE);
-            bool result = FeatureDB::getInstance()->updateFeature(featureID, updateFeature);
-            if (!result)
-                KLOG_DEBUG() << "update feature failed!";
-            KLOG_DEBUG() << "identifyFeature match success";
-        }
-        else
-        {
-            KLOG_DEBUG() << "matchResult:" << matchResult;
-        }
+    // 存在更新的模板
+    // 在数据库中替换掉原来的模板，保持FeatureID不变
+    if (matchResult == GENERAL_RESULT_OK)
+    {
+        QByteArray matchedFeature = saveTempl.mid((matchIndex - 1) * TEMPLATE_SIZE, TEMPLATE_SIZE);
+        featureID = FeatureDB::getInstance()->getFeatureID(matchedFeature);
+
+        QByteArray updateFeature((char *)updateTmpl, TEMPLATE_SIZE);
+        bool result = FeatureDB::getInstance()->updateFeature(featureID, updateFeature);
+        if (!result)
+            KLOG_DEBUG() << "update feature failed!";
+        KLOG_DEBUG() << "identifyFeature match success";
+    }
+    else
+    {
+        KLOG_DEBUG() << "matchResult:" << matchResult;
     }
 
     return featureID;

@@ -39,12 +39,26 @@ UKeyFTDevice::UKeyFTDevice(QObject *parent) : AuthDevice{parent},
 
 UKeyFTDevice::~UKeyFTDevice()
 {
-    m_driver->closeContainer(m_containerHandle);
-    m_driver->closeApplication(m_appHandle);
-    m_driver->disConnectDev(m_devHandle);
-    m_containerHandle = nullptr;
-    m_appHandle = nullptr;
-    m_devHandle = nullptr;
+    if (m_driver.data() != nullptr)
+    {
+        if (m_containerHandle)
+        {
+            m_driver->closeContainer(m_containerHandle);
+            m_containerHandle = nullptr;
+        }
+
+        if (m_appHandle)
+        {
+            m_driver->closeApplication(m_appHandle);
+            m_appHandle = nullptr;
+        }
+
+        if (m_devHandle)
+        {
+            m_driver->disConnectDev(m_devHandle);
+            m_devHandle = nullptr;
+        }
+    }
 }
 
 bool UKeyFTDevice::initDevice()
@@ -333,7 +347,8 @@ void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
     }
     else
     {
-        notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_MACTCH);
+        QString featureID = FeatureDB::getInstance()->getFeatureID(keyFeature);
+        notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_MACTCH,ret,featureID);
     }
 }
 
@@ -352,7 +367,8 @@ void UKeyFTDevice::notifyUKeyEnrollProcess(EnrollProcess process, ULONG error, c
         break;
     case ENROLL_PROCESS_REPEATED_ENROLL:
         message = tr("UKey has been bound");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_UKEY_EXIST_BINDING, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_REPEATED, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
     default:
         break;
     }

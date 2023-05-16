@@ -128,6 +128,7 @@ bool UKeySKFDriver::loadLibrary(QString libPath)
 {
     if (!QFile::exists(UKEY_DEFAULT_CONFIG))
     {
+        KLOG_ERROR() << "ukey-skf.conf not found";
         return false;
     }
 

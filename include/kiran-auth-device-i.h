@@ -42,8 +42,8 @@ extern "C"
         ENROLL_RESULT_PASS,
         // 因为扫描质量或者用户扫描过程中发生的问题引起
         ENROLL_RESULT_RETRY,
-        // UKey已经存在绑定关系
-        ENROLL_RESULT_UKEY_EXIST_BINDING
+        // 重复录入同一特征
+        ENROLL_RESULT_REPEATED
     };
 
     // 识别结果

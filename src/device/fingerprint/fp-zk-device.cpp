@@ -141,14 +141,14 @@ FPZKDevice::FPZKDevice(QObject* parent)
 FPZKDevice::~FPZKDevice()
 {
     acquireFeatureStop();
-    if (m_hDBCache)
-    {
-        m_driverLib->ZKFPM_DBFree(m_hDBCache);
-        m_hDBCache = NULL;
-    }
 
     if (m_driverLib.data())
     {
+        if (m_hDBCache)
+        {
+            m_driverLib->ZKFPM_DBFree(m_hDBCache);
+            m_hDBCache = NULL;
+        }
         m_driverLib->ZKFPM_Terminate();  // 释放资源
     }
 
@@ -267,13 +267,13 @@ QByteArray FPZKDevice::acquireFeature()
     /* |   设备  |   参数类型     |  参数值     |  参数数据长度  */
     m_driverLib->ZKFPM_GetParameters(hDevice, 1, (unsigned char*)paramValue, &cbParamValue);  // 获取采集器参数 图像宽
 
-    memset(paramValue, 0x0, 4);  // 初始化paramValue[4]
-    cbParamValue = 4;            // 初始化cbParamValue
+    memset(paramValue, 0x0, 4);                                                               // 初始化paramValue[4]
+    cbParamValue = 4;                                                                         // 初始化cbParamValue
     /* |   设备  |   参数类型     |  参数值     |  参数数据长度  */
     m_driverLib->ZKFPM_GetParameters(hDevice, 2, (unsigned char*)paramValue, &cbParamValue);  // 获取采集器参数 图像高
 
-    memset(paramValue, 0x0, 4);  // 初始化paramValue[4]
-    cbParamValue = 4;            // 初始化cbParamValue
+    memset(paramValue, 0x0, 4);                                                               // 初始化paramValue[4]
+    cbParamValue = 4;                                                                         // 初始化cbParamValue
     /* |   设备  |   参数类型     |  参数值     |  参数数据长度  */
     m_driverLib->ZKFPM_GetParameters(hDevice, 106, (unsigned char*)paramValue, &cbParamValue);  // 获取采集器参数 图像数据大小
 
@@ -373,12 +373,11 @@ int FPZKDevice::enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplat
     return score > 0 ? GENERAL_RESULT_OK : GENERAL_RESULT_FAIL;
 }
 
-
 QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureIDs)
 {
     QList<QByteArray> saveList;
     QString featureID;
-    DeviceInfo info  = this->deviceInfo();
+    DeviceInfo info = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
         saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct);
@@ -393,20 +392,23 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
         }
     }
 
-    if (saveList.count() != 0)
+    if (saveList.count() == 0)
     {
-        for (int j = 0; j < saveList.count(); j++)
+        return QString();
+    }
+
+    for (int j = 0; j < saveList.count(); j++)
+    {
+        auto saveTemplate = saveList.value(j);
+        int ret = enrollTemplateMatch(fpTemplate, saveTemplate);
+        // 指纹已经存在，直接返回该指纹
+        if (ret == GENERAL_RESULT_OK)
         {
-            auto saveTemplate = saveList.value(j);
-            int ret = enrollTemplateMatch(fpTemplate, saveTemplate);
-            // 指纹已经存在，直接返回该指纹
-            if (ret == GENERAL_RESULT_OK)
-            {
-                featureID = FeatureDB::getInstance()->getFeatureID(saveTemplate);
-                break;
-            }
+            featureID = FeatureDB::getInstance()->getFeatureID(saveTemplate);
+            break;
         }
     }
+
     return featureID;
 }
 
