@@ -28,18 +28,18 @@ namespace Kiran
 #define UKEY_CONTAINER_NAME "1003-3001"
 
 UKeyFTDevice::UKeyFTDevice(QObject *parent) : AuthDevice{parent},
-                                              m_libHandle(nullptr),
                                               m_appHandle(nullptr),
                                               m_devHandle(nullptr),
                                               m_containerHandle(nullptr)
 {
     setDeviceType(DEVICE_TYPE_UKey);
     setDeviceDriver(FT_UKEY_DRIVER_LIB);
+    m_driver = QSharedPointer<UKeySKFDriver>(new UKeySKFDriver());
 }
 
 UKeyFTDevice::~UKeyFTDevice()
 {
-    if (m_driver.data() != nullptr)
+    if (m_driver->isLoaded())
     {
         if (m_containerHandle)
         {
@@ -61,9 +61,8 @@ UKeyFTDevice::~UKeyFTDevice()
     }
 }
 
-bool UKeyFTDevice::initDevice()
+bool UKeyFTDevice::initDriver()
 {
-    m_driver = QSharedPointer<UKeySKFDriver>(new UKeySKFDriver());
     if (!m_driver->loadLibrary(FT_UKEY_DRIVER_LIB))
     {
         return false;
@@ -348,7 +347,7 @@ void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
     else
     {
         QString featureID = FeatureDB::getInstance()->getFeatureID(keyFeature);
-        notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_MACTCH,ret,featureID);
+        notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_MACTCH, ret, featureID);
     }
 }
 

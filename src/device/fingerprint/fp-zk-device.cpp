@@ -99,7 +99,7 @@ extern "C"
     typedef void (*T_ZKFPM_ConfigLog)(int nLevel, int nType, char* fileName);
 };
 
-struct DriverLib
+struct FPZKDriverLib
 {
     T_ZKFPM_Init ZKFPM_Init;
     T_ZKFPM_Terminate ZKFPM_Terminate;
@@ -124,10 +124,36 @@ struct DriverLib
 
     T_ZKFPM_SetLogLevel ZKFPM_SetLogLevel;
     T_ZKFPM_ConfigLog ZKFPM_ConfigLog;
+
+    void loadSym(Handle libHandle)
+    {
+        this->ZKFPM_Init = (T_ZKFPM_Init)dlsym(libHandle, "ZKFPM_Init");
+        this->ZKFPM_Terminate = (T_ZKFPM_Terminate)dlsym(libHandle, "ZKFPM_Terminate");
+        this->ZKFPM_GetDeviceCount = (T_ZKFPM_GetDeviceCount)dlsym(libHandle, "ZKFPM_GetDeviceCount");
+        this->ZKFPM_OpenDevice = (T_ZKFPM_OpenDevice)dlsym(libHandle, "ZKFPM_OpenDevice");
+        this->ZKFPM_CloseDevice = (T_ZKFPM_CloseDevice)dlsym(libHandle, "ZKFPM_CloseDevice");
+        this->ZKFPM_SetParameters = (T_ZKFPM_SetParameters)dlsym(libHandle, "ZKFPM_SetParameters");
+        this->ZKFPM_GetParameters = (T_ZKFPM_GetParameters)dlsym(libHandle, "ZKFPM_GetParameters");
+        this->ZKFPM_AcquireFingerprint = (T_ZKFPM_AcquireFingerprint)dlsym(libHandle, "ZKFPM_AcquireFingerprint");
+        this->ZKFPM_DBInit = (T_ZKFPM_DBInit)dlsym(libHandle, "ZKFPM_DBInit");
+        this->ZKFPM_DBFree = (T_ZKFPM_DBFree)dlsym(libHandle, "ZKFPM_DBFree");
+        this->ZKFPM_DBMerge = (T_ZKFPM_DBMerge)dlsym(libHandle, "ZKFPM_DBMerge");
+        this->ZKFPM_DBDel = (T_ZKFPM_DBDel)dlsym(libHandle, "ZKFPM_DBDel");
+        this->ZKFPM_DBAdd = (T_ZKFPM_DBAdd)dlsym(libHandle, "ZKFPM_DBAdd");
+        this->ZKFPM_DBClear = (T_ZKFPM_DBClear)dlsym(libHandle, "ZKFPM_DBClear");
+        this->ZKFPM_DBCount = (T_ZKFPM_DBCount)dlsym(libHandle, "ZKFPM_DBCount");
+        this->ZKFPM_DBIdentify = (T_ZKFPM_DBIdentify)dlsym(libHandle, "ZKFPM_DBIdentify");
+        this->ZKFPM_DBMatch = (T_ZKFPM_DBMatch)dlsym(libHandle, "ZKFPM_DBMatch");
+        this->ZKFPM_SetLogLevel = (T_ZKFPM_SetLogLevel)dlsym(libHandle, "ZKFPM_SetLogLevel");
+        this->ZKFPM_ConfigLog = (T_ZKFPM_ConfigLog)dlsym(libHandle, "ZKFPM_ConfigLog");
+
+        this->isLoaded = true;
+    };
+    bool isLoaded = false;
 };
 
 FPZKDevice::FPZKDevice(QObject* parent)
-    : FPDevice{parent},
+    : BioDevice{parent},
       m_hDBCache(nullptr),
       m_libHandle(nullptr),
       m_driverLib(nullptr)
@@ -135,6 +161,7 @@ FPZKDevice::FPZKDevice(QObject* parent)
     setDeviceType(DEVICE_TYPE_FingerPrint);
     setDeviceDriver(FP_ZK_DRIVER_LIB);
     setMergeTemplateCount(FP_ZK_MEGER_TEMPLATE_COUNT);
+    m_driverLib = QSharedPointer<FPZKDriverLib>(new FPZKDriverLib);
 }
 
 // 析构时对设备进行资源回收
@@ -142,7 +169,7 @@ FPZKDevice::~FPZKDevice()
 {
     acquireFeatureStop();
 
-    if (m_driverLib.data())
+    if (m_driverLib->isLoaded)
     {
         if (m_hDBCache)
         {
@@ -159,7 +186,7 @@ FPZKDevice::~FPZKDevice()
     }
 }
 
-bool FPZKDevice::initDevice()
+bool FPZKDevice::initDriver()
 {
     if (!loadLib())
     {
@@ -191,31 +218,7 @@ bool FPZKDevice::loadLib()
         return false;
     }
 
-    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
-    m_driverLib->ZKFPM_Init = (T_ZKFPM_Init)dlsym(m_libHandle, "ZKFPM_Init");
-    if (NULL == m_driverLib->ZKFPM_Init)
-    {
-        return false;
-    }
-
-    m_driverLib->ZKFPM_Terminate = (T_ZKFPM_Terminate)dlsym(m_libHandle, "ZKFPM_Terminate");
-    m_driverLib->ZKFPM_GetDeviceCount = (T_ZKFPM_GetDeviceCount)dlsym(m_libHandle, "ZKFPM_GetDeviceCount");
-    m_driverLib->ZKFPM_OpenDevice = (T_ZKFPM_OpenDevice)dlsym(m_libHandle, "ZKFPM_OpenDevice");
-    m_driverLib->ZKFPM_CloseDevice = (T_ZKFPM_CloseDevice)dlsym(m_libHandle, "ZKFPM_CloseDevice");
-    m_driverLib->ZKFPM_SetParameters = (T_ZKFPM_SetParameters)dlsym(m_libHandle, "ZKFPM_SetParameters");
-    m_driverLib->ZKFPM_GetParameters = (T_ZKFPM_GetParameters)dlsym(m_libHandle, "ZKFPM_GetParameters");
-    m_driverLib->ZKFPM_AcquireFingerprint = (T_ZKFPM_AcquireFingerprint)dlsym(m_libHandle, "ZKFPM_AcquireFingerprint");
-    m_driverLib->ZKFPM_DBInit = (T_ZKFPM_DBInit)dlsym(m_libHandle, "ZKFPM_DBInit");
-    m_driverLib->ZKFPM_DBFree = (T_ZKFPM_DBFree)dlsym(m_libHandle, "ZKFPM_DBFree");
-    m_driverLib->ZKFPM_DBMerge = (T_ZKFPM_DBMerge)dlsym(m_libHandle, "ZKFPM_DBMerge");
-    m_driverLib->ZKFPM_DBDel = (T_ZKFPM_DBDel)dlsym(m_libHandle, "ZKFPM_DBDel");
-    m_driverLib->ZKFPM_DBAdd = (T_ZKFPM_DBAdd)dlsym(m_libHandle, "ZKFPM_DBAdd");
-    m_driverLib->ZKFPM_DBClear = (T_ZKFPM_DBClear)dlsym(m_libHandle, "ZKFPM_DBClear");
-    m_driverLib->ZKFPM_DBCount = (T_ZKFPM_DBCount)dlsym(m_libHandle, "ZKFPM_DBCount");
-    m_driverLib->ZKFPM_DBIdentify = (T_ZKFPM_DBIdentify)dlsym(m_libHandle, "ZKFPM_DBIdentify");
-    m_driverLib->ZKFPM_DBMatch = (T_ZKFPM_DBMatch)dlsym(m_libHandle, "ZKFPM_DBMatch");
-    m_driverLib->ZKFPM_SetLogLevel = (T_ZKFPM_SetLogLevel)dlsym(m_libHandle, "ZKFPM_SetLogLevel");
-    m_driverLib->ZKFPM_ConfigLog = (T_ZKFPM_ConfigLog)dlsym(m_libHandle, "ZKFPM_ConfigLog");
+    m_driverLib->loadSym(m_libHandle);
 
     return true;
 }
@@ -260,7 +263,7 @@ QByteArray FPZKDevice::acquireFeature()
     unsigned char szTemplate[FP_ZK_MAX_TEMPLATE_SIZE];
     unsigned int tempLen = FP_ZK_MAX_TEMPLATE_SIZE;
     unsigned int curTime;
-    int ret; 
+    int ret;
 
     memset(paramValue, 0x0, 4);  // 初始化paramValue[4]
     cbParamValue = 4;            // 初始化cbParamValue
@@ -323,7 +326,7 @@ QByteArray FPZKDevice::acquireFeature()
 void FPZKDevice::acquireFeatureStop()
 {
     m_doAcquire = false;
-    if (m_futureWatcher.data() != nullptr)
+    if (!m_futureWatcher.isNull())
     {
         m_futureWatcher->waitForFinished();
     }

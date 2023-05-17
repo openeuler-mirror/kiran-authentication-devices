@@ -18,7 +18,7 @@
 
 namespace Kiran
 {
-struct DriverLib;
+struct SKFDriverLib;
 
 class UKeySKFDriver : public BDriver
 {
@@ -29,6 +29,7 @@ public:
     QString getFullName() override;
     quint16 getDriverId() override;
 
+    bool isLoaded();
     bool loadLibrary(QString libPath);
     DEVHANDLE connectDev();
     void deleteAllApplication(DEVHANDLE devHandle);
@@ -55,7 +56,7 @@ public:
     QString getDefaultValueFromConf(const QString &key);
 
 private:
-    QSharedPointer<DriverLib> m_driverLib;
+    QSharedPointer<SKFDriverLib> m_driverLib;
     HANDLE m_libHandle;
 };
 

@@ -174,6 +174,20 @@ QString FeatureDB::getFeatureID(QByteArray feature)
     return QString();
 }
 
+QStringList FeatureDB::getAllFeatureIDs()
+{
+    QSqlQuery query(m_database);
+    query.prepare("SELECT featureID  FROM feature");
+    query.exec();
+    QStringList featureIDs;
+    while (query.next())
+    {
+        QString featureID = query.value(0).toString();
+        featureIDs << featureID;
+    }
+    return featureIDs;
+}
+
 bool FeatureDB::updateFeature(const QString &featureID, QByteArray newFeature)
 {
     QSqlQuery query(m_database);
@@ -188,8 +202,8 @@ bool FeatureDB::contains(const QString &featureID)
     QSqlQuery query(m_database);
     query.prepare("SELECT featureID  FROM feature WHERE featureID = :id");
     query.bindValue(":id", featureID);
-    query.exec();    
-    if(query.next())
+    query.exec();
+    if (query.next())
     {
         return true;
     }

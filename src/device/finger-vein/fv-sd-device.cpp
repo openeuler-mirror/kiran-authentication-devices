@@ -90,9 +90,8 @@ extern "C"
     typedef int (*TGSetDevLedFunc)(int ledBlue, int ledGreen, int ledRed);
 }
 
-struct DriverLib
-{
-    // libTGFVProcessAPI.so
+struct FVSDDriverLib
+{  // libTGFVProcessAPI.so
     TGInitFVProcessFunc TGInitFVProcess;
     TGImgExtractFeatureVerifyFunc TGImgExtractFeatureVerify;
     TGFeaturesFusionTmplFunc TGFeaturesFusionTmpl;
@@ -109,6 +108,28 @@ struct DriverLib
     TGGetDevImageFunc TGGetDevImage;
     TGCancelGetImageFunc TGCancelGetImage;
     TGSetDevLedFunc TGSetDevLed;
+
+    void loadSym(Handle libProcessHandle, Handle libComHandle)
+    {
+        this->TGInitFVProcess = (TGInitFVProcessFunc)dlsym(libProcessHandle, "TGInitFVProcess");
+        this->TGImgExtractFeatureVerify = (TGImgExtractFeatureVerifyFunc)dlsym(libProcessHandle, "TGImgExtractFeatureVerify");
+        this->TGFeaturesFusionTmpl = (TGFeaturesFusionTmplFunc)dlsym(libProcessHandle, "TGFeaturesFusionTmpl");
+        this->TGFeatureMatchTmpl1N = (TGFeatureMatchTmpl1NFunc)dlsym(libProcessHandle, "TGFeatureMatchTmpl1N");
+        this->TGImgExtractFeatureRegister = (TGImgExtractFeatureRegisterFunc)dlsym(libProcessHandle, "TGImgExtractFeatureRegister");
+
+        this->TGOpenDev = (TGOpenDevFunc)dlsym(libComHandle, "TGOpenDev");
+        this->TGGetDevStatus = (TGGetDevStatusFunc)dlsym(libComHandle, "TGGetDevStatus");
+        this->TGCloseDev = (TGCloseDevFunc)dlsym(libComHandle, "TGCloseDev");
+        this->TGGetDevFW = (TGGetDevFWFunc)dlsym(libComHandle, "TGGetDevFW");
+        this->TGGetDevSN = (TGGetDevSNFunc)dlsym(libComHandle, "TGGetDevSN");
+        this->TGPlayDevVoice = (TGPlayDevVoiceFunc)dlsym(libComHandle, "TGPlayDevVoice");
+        this->TGGetDevImage = (TGGetDevImageFunc)dlsym(libComHandle, "TGGetDevImage");
+        this->TGCancelGetImage = (TGCancelGetImageFunc)dlsym(libComHandle, "TGCancelGetImage");
+        this->TGSetDevLed = (TGSetDevLedFunc)dlsym(libComHandle, "TGSetDevLed");
+
+        this->isLoaded = true;
+    };
+    bool isLoaded = false;
 };
 
 FVSDDevice::FVSDDevice(QObject *parent) : BioDevice{parent},
@@ -119,19 +140,17 @@ FVSDDevice::FVSDDevice(QObject *parent) : BioDevice{parent},
     setDeviceType(DEVICE_TYPE_FingerVein);
     setDeviceDriver(SD_FV_DRIVER_LIB);
     setMergeTemplateCount(TEMPLATE_FV_NUM);
+    m_driverLib = QSharedPointer<FVSDDriverLib>(new FVSDDriverLib);
 }
 
 FVSDDevice::~FVSDDevice()
 {
-    if (!deviceID().isEmpty())
+    if (m_driverLib->isLoaded)
     {
         acquireFeatureStop();
-        if (m_driverLib.data() != nullptr)
-        {
-            m_driverLib->TGCloseDev();
-        }
+        m_driverLib->TGCloseDev();
     }
-
+    
     if (m_libComHandle)
     {
         dlclose(m_libComHandle);
@@ -162,27 +181,12 @@ bool FVSDDevice::loadLib()
         return false;
     }
 
-    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
-    m_driverLib->TGInitFVProcess = (TGInitFVProcessFunc)dlsym(m_libProcessHandle, "TGInitFVProcess");
-    m_driverLib->TGImgExtractFeatureVerify = (TGImgExtractFeatureVerifyFunc)dlsym(m_libProcessHandle, "TGImgExtractFeatureVerify");
-    m_driverLib->TGFeaturesFusionTmpl = (TGFeaturesFusionTmplFunc)dlsym(m_libProcessHandle, "TGFeaturesFusionTmpl");
-    m_driverLib->TGFeatureMatchTmpl1N = (TGFeatureMatchTmpl1NFunc)dlsym(m_libProcessHandle, "TGFeatureMatchTmpl1N");
-    m_driverLib->TGImgExtractFeatureRegister = (TGImgExtractFeatureRegisterFunc)dlsym(m_libProcessHandle, "TGImgExtractFeatureRegister");
-
-    m_driverLib->TGOpenDev = (TGOpenDevFunc)dlsym(m_libComHandle, "TGOpenDev");
-    m_driverLib->TGGetDevStatus = (TGGetDevStatusFunc)dlsym(m_libComHandle, "TGGetDevStatus");
-    m_driverLib->TGCloseDev = (TGCloseDevFunc)dlsym(m_libComHandle, "TGCloseDev");
-    m_driverLib->TGGetDevFW = (TGGetDevFWFunc)dlsym(m_libComHandle, "TGGetDevFW");
-    m_driverLib->TGGetDevSN = (TGGetDevSNFunc)dlsym(m_libComHandle, "TGGetDevSN");
-    m_driverLib->TGPlayDevVoice = (TGPlayDevVoiceFunc)dlsym(m_libComHandle, "TGPlayDevVoice");
-    m_driverLib->TGGetDevImage = (TGGetDevImageFunc)dlsym(m_libComHandle, "TGGetDevImage");
-    m_driverLib->TGCancelGetImage = (TGCancelGetImageFunc)dlsym(m_libComHandle, "TGCancelGetImage");
-    m_driverLib->TGSetDevLed = (TGSetDevLedFunc)dlsym(m_libComHandle, "TGSetDevLed");
+    m_driverLib->loadSym(m_libProcessHandle, m_libComHandle);
 
     return true;
 }
 
-bool FVSDDevice::initDevice()
+bool FVSDDevice::initDriver()
 {
     if (!loadLib())
     {
@@ -287,7 +291,7 @@ QByteArray FVSDDevice::acquireFeature()
 void FVSDDevice::acquireFeatureStop()
 {
     m_driverLib->TGCancelGetImage();
-    if (m_futureWatcher.data() != nullptr)
+    if (!m_futureWatcher.isNull())
     {
         m_futureWatcher->waitForFinished();
     }

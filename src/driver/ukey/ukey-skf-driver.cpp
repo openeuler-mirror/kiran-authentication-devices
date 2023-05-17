@@ -68,7 +68,7 @@ extern "C"
     typedef ULONG (*SKF_CreateContainer_Func)(HAPPLICATION hApplication, LPSTR szContainerName, HCONTAINER *phContainer);
 }
 
-struct DriverLib
+struct SKFDriverLib
 {
     SKF_EnumDev_Func SKF_EnumDev;
     SKF_ConnectDev_Func SKF_ConnectDev;
@@ -96,10 +96,46 @@ struct DriverLib
     SKF_DevAuth_Func SKF_DevAuth;
     SKF_DeleteApplication_Func SKF_DeleteApplication;
     SKF_CreateContainer_Func SKF_CreateContainer;
+
+    void loadSym(HANDLE libHandle)
+    {
+        this->SKF_EnumDev = (SKF_EnumDev_Func)dlsym(libHandle, "SKF_EnumDev");
+        this->SKF_ConnectDev = (SKF_ConnectDev_Func)dlsym(libHandle, "SKF_ConnectDev");
+        this->SKF_DisConnectDev = (SKF_DisConnectDev_Func)dlsym(libHandle, "SKF_DisConnectDev");
+        this->SKF_GetDevState = (SKF_GetDevState_Func)dlsym(libHandle, "SKF_GetDevState");
+        this->SKF_GetDevInfo = (SKF_GetDevInfo_Func)dlsym(libHandle, "SKF_GetDevInfo");
+        this->SKF_SetLabel = (SKF_SetLabel_Func)dlsym(libHandle, "SKF_SetLabel");
+        this->SKF_OpenApplication = (SKF_OpenApplication_Func)dlsym(libHandle, "SKF_OpenApplication");
+        this->SKF_VerifyPIN = (SKF_VerifyPIN_Func)dlsym(libHandle, "SKF_VerifyPIN");
+        this->SKF_OpenContainer = (SKF_OpenContainer_Func)dlsym(libHandle, "SKF_OpenContainer");
+        this->SKF_GenECCKeyPair = (SKF_GenECCKeyPair_Func)dlsym(libHandle, "SKF_GenECCKeyPair");
+        this->SKF_CloseContainer = (SKF_CloseContainer_Func)dlsym(libHandle, "SKF_CloseContainer");
+        this->SKF_CloseApplication = (SKF_CloseApplication_Func)dlsym(libHandle, "SKF_CloseApplication");
+        this->SKF_CreateApplication = (SKF_CreateApplication_Func)dlsym(libHandle, "SKF_CreateApplication");
+        this->SKF_EnumApplication = (SKF_EnumApplication_Func)dlsym(libHandle, "SKF_EnumApplication");
+        this->SKF_ExportPublicKey = (SKF_ExportPublicKey_Func)dlsym(libHandle, "SKF_ExportPublicKey");
+        this->SKF_Digest = (SKF_Digest_Func)dlsym(libHandle, "SKF_Digest");
+        this->SKF_DigestInit = (SKF_DigestInit_Func)dlsym(libHandle, "SKF_DigestInit");
+        this->SKF_ECCSignData = (SKF_ECCSignData_Func)dlsym(libHandle, "SKF_ECCSignData");
+        this->SKF_ECCVerify = (SKF_ECCVerify_Func)dlsym(libHandle, "SKF_ECCVerify");
+        this->SKF_GenRandom = (SKF_GenRandom_Func)dlsym(libHandle, "SKF_GenRandom");
+        this->SKF_SetSymmKey = (SKF_SetSymmKey_Func)dlsym(libHandle, "SKF_SetSymmKey");
+        this->SKF_EncryptInit = (SKF_EncryptInit_Func)dlsym(libHandle, "SKF_EncryptInit");
+        this->SKF_Encrypt = (SKF_Encrypt_Func)dlsym(libHandle, "SKF_Encrypt");
+        this->SKF_DevAuth = (SKF_DevAuth_Func)dlsym(libHandle, "SKF_DevAuth");
+        this->SKF_DeleteApplication = (SKF_DeleteApplication_Func)dlsym(libHandle, "SKF_DeleteApplication");
+        this->SKF_CreateContainer = (SKF_CreateContainer_Func)dlsym(libHandle, "SKF_CreateContainer");
+
+        this->isLoaded = true;
+    }
+
+    bool isLoaded = false;
 };
 
-UKeySKFDriver::UKeySKFDriver(QObject *parent) : BDriver(parent)
+UKeySKFDriver::UKeySKFDriver(QObject *parent) : BDriver(parent),
+                                                m_libHandle(nullptr)
 {
+    m_driverLib = QSharedPointer<SKFDriverLib>(new SKFDriverLib);
 }
 
 UKeySKFDriver::~UKeySKFDriver()
@@ -139,42 +175,20 @@ bool UKeySKFDriver::loadLibrary(QString libPath)
         return false;
     }
 
-    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
-    m_driverLib->SKF_EnumDev = (SKF_EnumDev_Func)dlsym(m_libHandle, "SKF_EnumDev");
-    m_driverLib->SKF_ConnectDev = (SKF_ConnectDev_Func)dlsym(m_libHandle, "SKF_ConnectDev");
-    m_driverLib->SKF_DisConnectDev = (SKF_DisConnectDev_Func)dlsym(m_libHandle, "SKF_DisConnectDev");
-    m_driverLib->SKF_GetDevState = (SKF_GetDevState_Func)dlsym(m_libHandle, "SKF_GetDevState");
-    m_driverLib->SKF_GetDevInfo = (SKF_GetDevInfo_Func)dlsym(m_libHandle, "SKF_GetDevInfo");
-    m_driverLib->SKF_SetLabel = (SKF_SetLabel_Func)dlsym(m_libHandle, "SKF_SetLabel");
-    m_driverLib->SKF_OpenApplication = (SKF_OpenApplication_Func)dlsym(m_libHandle, "SKF_OpenApplication");
-    m_driverLib->SKF_VerifyPIN = (SKF_VerifyPIN_Func)dlsym(m_libHandle, "SKF_VerifyPIN");
-    m_driverLib->SKF_OpenContainer = (SKF_OpenContainer_Func)dlsym(m_libHandle, "SKF_OpenContainer");
-    m_driverLib->SKF_GenECCKeyPair = (SKF_GenECCKeyPair_Func)dlsym(m_libHandle, "SKF_GenECCKeyPair");
-    m_driverLib->SKF_CloseContainer = (SKF_CloseContainer_Func)dlsym(m_libHandle, "SKF_CloseContainer");
-    m_driverLib->SKF_CloseApplication = (SKF_CloseApplication_Func)dlsym(m_libHandle, "SKF_CloseApplication");
-    m_driverLib->SKF_CreateApplication = (SKF_CreateApplication_Func)dlsym(m_libHandle, "SKF_CreateApplication");
-    m_driverLib->SKF_EnumApplication = (SKF_EnumApplication_Func)dlsym(m_libHandle, "SKF_EnumApplication");
-    m_driverLib->SKF_ExportPublicKey = (SKF_ExportPublicKey_Func)dlsym(m_libHandle, "SKF_ExportPublicKey");
-    m_driverLib->SKF_Digest = (SKF_Digest_Func)dlsym(m_libHandle, "SKF_Digest");
-    m_driverLib->SKF_DigestInit = (SKF_DigestInit_Func)dlsym(m_libHandle, "SKF_DigestInit");
-    m_driverLib->SKF_ECCSignData = (SKF_ECCSignData_Func)dlsym(m_libHandle, "SKF_ECCSignData");
-    m_driverLib->SKF_ECCVerify = (SKF_ECCVerify_Func)dlsym(m_libHandle, "SKF_ECCVerify");
-    m_driverLib->SKF_GenRandom = (SKF_GenRandom_Func)dlsym(m_libHandle, "SKF_GenRandom");
-    m_driverLib->SKF_SetSymmKey = (SKF_SetSymmKey_Func)dlsym(m_libHandle, "SKF_SetSymmKey");
-    m_driverLib->SKF_EncryptInit = (SKF_EncryptInit_Func)dlsym(m_libHandle, "SKF_EncryptInit");
-    m_driverLib->SKF_Encrypt = (SKF_Encrypt_Func)dlsym(m_libHandle, "SKF_Encrypt");
-    m_driverLib->SKF_DevAuth = (SKF_DevAuth_Func)dlsym(m_libHandle, "SKF_DevAuth");
-    m_driverLib->SKF_DeleteApplication = (SKF_DeleteApplication_Func)dlsym(m_libHandle, "SKF_DeleteApplication");
-    m_driverLib->SKF_CreateContainer = (SKF_CreateContainer_Func)dlsym(m_libHandle, "SKF_CreateContainer");
+    m_driverLib->loadSym(m_libHandle);
 
     return true;
+}
+
+bool UKeySKFDriver::isLoaded()
+{
+    return m_driverLib->isLoaded;
 }
 
 DEVHANDLE UKeySKFDriver::connectDev()
 {
     ULONG ulBufSize = 0;
     ULONG ulReval = m_driverLib->SKF_EnumDev(TRUE, NULL, &ulBufSize);
-
     if (ulReval != SAR_OK)
     {
         KLOG_DEBUG() << "Enum Dev error:" << getErrorReason(ulReval);

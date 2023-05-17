@@ -38,6 +38,7 @@ public:
     QList<QByteArray> getAllFeatures();
     QStringList getFeatureIDs(const QString &idVendor,const QString &idProduct);
     QString getFeatureID(QByteArray feature);
+    QStringList getAllFeatureIDs();
 
     bool updateFeature(const QString &featureID, QByteArray newFeature);
 

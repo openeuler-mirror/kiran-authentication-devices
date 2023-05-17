@@ -42,7 +42,7 @@ public:
     explicit AuthDevice(QObject *parent = nullptr);
     virtual ~AuthDevice();
     bool init();
-    virtual bool initDevice() = 0;
+    virtual bool initDriver() = 0;
 
     QDBusObjectPath getObjectPath() { return m_objectPath; };
     QString deviceID() { return m_deviceID; };

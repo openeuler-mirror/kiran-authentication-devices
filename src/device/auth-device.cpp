@@ -35,7 +35,7 @@ AuthDevice::~AuthDevice(){};
 
 bool AuthDevice::init()
 {
-    if (!initDevice())
+    if (!initDriver())
     {
         return false;
     }

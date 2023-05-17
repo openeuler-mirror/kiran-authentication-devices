@@ -98,12 +98,7 @@ QDBusObjectPath AuthDeviceManager::GetDevice(const QString& device_id)
 
 QStringList AuthDeviceManager::GetAllFeatureIDs()
 {
-    QStringList allFeatureIDs;
-    auto devices = m_deviceMap.values();
-    Q_FOREACH (AuthDevicePtr device, devices)
-    {
-        allFeatureIDs << device->GetFeatureIDList();
-    }
+    QStringList allFeatureIDs = FeatureDB::getInstance()->getAllFeatureIDs();
     KLOG_DEBUG() << "allFeatureIDs:" << allFeatureIDs;
     return allFeatureIDs;
 }
