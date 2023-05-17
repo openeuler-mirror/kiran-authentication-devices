@@ -15,8 +15,8 @@
 #include "bio-device.h"
 #include <qt5-log-i.h>
 #include <QtConcurrent>
-#include "feature-db.h"
 #include "auth_device_adaptor.h"
+#include "feature-db.h"
 
 namespace Kiran
 {
@@ -45,7 +45,7 @@ void BioDevice::doingEnrollStart(const QString &extraInfo)
         internalStopEnroll();
         return;
     }
-
+    m_doAcquire = true;
     auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
     m_futureWatcher->setFuture(future);
 }
@@ -53,6 +53,7 @@ void BioDevice::doingEnrollStart(const QString &extraInfo)
 void BioDevice::doingIdentifyStart(const QString &value)
 {
     KLOG_DEBUG() << "biological information identify start";
+    m_doAcquire = true;
     auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
     m_futureWatcher->setFuture(future);
 }
@@ -136,6 +137,14 @@ void BioDevice::doingIdentifyProcess(QByteArray feature)
 
 void BioDevice::handleAcquiredFeature()
 {
+    auto future = m_futureWatcher->future();
+    if (!future.isResultReadyAt(0))
+    {
+        KLOG_DEBUG()  <<  "acquired feature is not available";
+        acquireFeatureFail();
+        return;
+    }
+
     QByteArray feature = m_futureWatcher->result();
     if (feature.isEmpty())
     {

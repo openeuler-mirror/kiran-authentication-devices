@@ -244,6 +244,7 @@ Handle FPZKDevice::openDevice()
 
 QByteArray FPZKDevice::acquireFeature()
 {
+    KLOG_DEBUG() << "start acquire feature";
     Handle hDevice = openDevice();
     if (!hDevice)
     {
@@ -259,8 +260,7 @@ QByteArray FPZKDevice::acquireFeature()
     unsigned char szTemplate[FP_ZK_MAX_TEMPLATE_SIZE];
     unsigned int tempLen = FP_ZK_MAX_TEMPLATE_SIZE;
     unsigned int curTime;
-    int ret;
-    m_doAcquire = true;
+    int ret; 
 
     memset(paramValue, 0x0, 4);  // 初始化paramValue[4]
     cbParamValue = 4;            // 初始化cbParamValue
@@ -294,6 +294,7 @@ QByteArray FPZKDevice::acquireFeature()
                                                     szTemplate, &tempLen);
         if (ret == GENERAL_RESULT_OK)
         {
+            KLOG_DEBUG() << "acquire fingerprint success";
             break;
         }
         else if (ret == ZKFP_ERR_EXTRACT_FP ||
