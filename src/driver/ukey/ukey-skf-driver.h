@@ -25,9 +25,6 @@ class UKeySKFDriver : public BDriver
 public:
     UKeySKFDriver(QObject *parent = nullptr);
     ~UKeySKFDriver();
-    QString getName() override;
-    QString getFullName() override;
-    quint16 getDriverId() override;
 
     bool isLoaded();
     bool loadLibrary(QString libPath);

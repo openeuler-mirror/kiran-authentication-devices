@@ -72,7 +72,7 @@ private:
     QSharedPointer<UdevMonitor> m_udevMonitor;
     QSharedPointer<AuthDeviceManagerAdaptor> m_dbusAdaptor;
     // 总线 -- AuthDevice对象对应
-    QMap<QString, QSharedPointer<AuthDevice>> m_deviceMap;
+    QMultiMap<QString, QSharedPointer<AuthDevice>> m_deviceMap;
     QSharedPointer<ContextFactory> m_contextFactory;
     QTimer m_timer;
 

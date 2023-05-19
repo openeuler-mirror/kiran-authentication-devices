@@ -100,3 +100,5 @@ enum IdentifyProcess
 }  // namespace Kiran
 
 Q_DECLARE_METATYPE(Kiran::DeviceInfo);
+Q_DECLARE_METATYPE(Kiran::EnrollProcess);
+Q_DECLARE_METATYPE(Kiran::IdentifyProcess);

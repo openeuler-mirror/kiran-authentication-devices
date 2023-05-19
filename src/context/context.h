@@ -21,6 +21,7 @@ namespace Kiran
 {
 class AuthDevice;
 typedef QSharedPointer<AuthDevice> AuthDevicePtr;
+typedef QList<AuthDevicePtr> AuthDeviceList;
 
 class Context : public QObject
 {
@@ -28,7 +29,7 @@ class Context : public QObject
 public:
     explicit Context(QObject *parent = nullptr);
     virtual AuthDevicePtr createDevice(const QString &idVendor, const QString &idProduct) = 0;
-    virtual QList<AuthDevicePtr> getDevices() { return m_deviceMap.values(); };
+    virtual AuthDeviceList getDevices() { return m_deviceMap.values(); };
 
 protected:
     QMap<QString, AuthDevicePtr> m_deviceMap;

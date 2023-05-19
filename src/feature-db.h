@@ -16,6 +16,7 @@
 #include <QSqlDatabase>
 #include <QSqlQuery>
 #include "auth-enum.h"
+#include "kiran-auth-device-i.h"
 
 namespace Kiran
 {
@@ -30,13 +31,13 @@ public:
     static void globalDeinit() {delete m_instance;};
     
     bool createDBConnection();
-    bool addFeature(const QString &featureID, QByteArray feature, DeviceInfo deviceInfo);
+    bool addFeature(const QString &featureID, QByteArray feature, DeviceInfo deviceInfo, DeviceType deviceType);
     bool deleteFeature(const QString &featureID);
 
     QByteArray getFeature(const QString &featureID);
-    QList<QByteArray> getFeatures(const QString &idVendor,const QString &idProduct);
+    QList<QByteArray> getFeatures(const QString &idVendor,const QString &idProduct, DeviceType deviceType);
     QList<QByteArray> getAllFeatures();
-    QStringList getFeatureIDs(const QString &idVendor,const QString &idProduct);
+    QStringList getFeatureIDs(const QString &idVendor,const QString &idProduct, DeviceType deviceType);
     QString getFeatureID(QByteArray feature);
     QStringList getAllFeatureIDs();
 

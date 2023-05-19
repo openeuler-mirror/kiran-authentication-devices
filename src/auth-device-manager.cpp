@@ -207,19 +207,22 @@ void AuthDeviceManager::init()
     }
 
     m_udevMonitor = QSharedPointer<UdevMonitor>(new UdevMonitor());
-    connect(m_udevMonitor.data(),&UdevMonitor::deviceAdded,this,&AuthDeviceManager::handleDeviceAdded);
-    connect(m_udevMonitor.data(),&UdevMonitor::deviceDeleted,this,&AuthDeviceManager::handleDeviceDeleted);
-    
+    connect(m_udevMonitor.data(), &UdevMonitor::deviceAdded, this, &AuthDeviceManager::handleDeviceAdded);
+    connect(m_udevMonitor.data(), &UdevMonitor::deviceDeleted, this, &AuthDeviceManager::handleDeviceDeleted);
+
     auto usbInfoList = Utils::enumerateDevices();
     // 枚举设备后，生成设备对象
     Q_FOREACH (auto deviceInfo, usbInfoList)
     {
         if (m_contextFactory->isDeviceSupported(deviceInfo.idVendor, deviceInfo.idProduct))
         {
-            AuthDevicePtr device = m_contextFactory->createDevice(deviceInfo.idVendor, deviceInfo.idProduct);
-            if (device)
+            AuthDeviceList deviceList = m_contextFactory->createDevices(deviceInfo.idVendor, deviceInfo.idProduct);
+            if (deviceList.count() != 0)
             {
-                m_deviceMap.insert(deviceInfo.busPath, device);
+                Q_FOREACH (auto device, deviceList)
+                {
+                    m_deviceMap.insert(deviceInfo.busPath, device);
+                }
             }
             else
             {
@@ -233,16 +236,19 @@ void AuthDeviceManager::handleDeviceAdded(const DeviceInfo& deviceInfo)
 {
     if (m_contextFactory->isDeviceSupported(deviceInfo.idVendor, deviceInfo.idProduct))
     {
-        AuthDevicePtr device = m_contextFactory->createDevice(deviceInfo.idVendor, deviceInfo.idProduct);
-        if (device)
+        AuthDeviceList deviceList = m_contextFactory->createDevices(deviceInfo.idVendor, deviceInfo.idProduct);
+        if (deviceList.count() != 0)
         {
-            m_deviceMap.insert(deviceInfo.busPath, device);
-            Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
-            Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
-            KLOG_DEBUG() << "auth device added"
-                         << "idVendor:" << deviceInfo.idVendor
-                         << "idProduct:" << deviceInfo.idProduct
-                         << "bus:" << deviceInfo.busPath;
+            Q_FOREACH (auto device, deviceList)
+            {
+                m_deviceMap.insert(deviceInfo.busPath, device);
+                Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
+                Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
+                KLOG_DEBUG() << "auth device added"
+                             << "idVendor:" << deviceInfo.idVendor
+                             << "idProduct:" << deviceInfo.idProduct
+                             << "bus:" << deviceInfo.busPath;
+            }
         }
         else
         {
@@ -325,17 +331,20 @@ void AuthDeviceManager::handleDeviceReCreate()
             else
             {
                 auto deviceInfo = i.key();
-                AuthDevicePtr device = m_contextFactory->createDevice(deviceInfo.idVendor, deviceInfo.idProduct);
-                if (device)
+                AuthDeviceList deviceList = m_contextFactory->createDevices(deviceInfo.idVendor, deviceInfo.idProduct);
+                if (deviceList.count() != 0)
                 {
-                    m_deviceMap.insert(deviceInfo.busPath, device);
-                    Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
-                    Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
+                    Q_FOREACH (auto device, deviceList)
+                    {
+                        m_deviceMap.insert(deviceInfo.busPath, device);
+                        Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
+                        Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
 
-                    KLOG_DEBUG() << "device added"
-                                 << "idVendor:" << deviceInfo.idVendor
-                                 << "idProduct:" << deviceInfo.idProduct
-                                 << "bus:" << deviceInfo.busPath;
+                        KLOG_DEBUG() << "device added"
+                                     << "idVendor:" << deviceInfo.idVendor
+                                     << "idProduct:" << deviceInfo.idProduct
+                                     << "bus:" << deviceInfo.busPath;
+                    }
 
                     m_retreyCreateDeviceMap.remove(i.key());
                 }

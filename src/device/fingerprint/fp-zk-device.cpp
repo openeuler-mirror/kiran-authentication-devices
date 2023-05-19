@@ -384,7 +384,7 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
     DeviceInfo info = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct);
+        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct,deviceType());
     }
     else
     {
@@ -419,7 +419,7 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
 bool FPZKDevice::saveFPrintTemplate(QByteArray fpTemplate, const QString& featureID)
 {
     DeviceInfo deviceInfo = this->deviceInfo();
-    bool save = FeatureDB::getInstance()->addFeature(featureID, fpTemplate, deviceInfo);
+    bool save = FeatureDB::getInstance()->addFeature(featureID, fpTemplate, deviceInfo,deviceType());
     return save;
 }
 

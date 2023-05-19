@@ -99,7 +99,7 @@ void UKeyFTDevice::doingEnrollStart(const QString &extraInfo)
         {
             m_driver->deleteAllApplication(m_devHandle);
             DeviceInfo deviceInfo = this->deviceInfo();
-            QStringList idList = FeatureDB::getInstance()->getFeatureIDs(deviceInfo.idVendor, deviceInfo.idProduct);
+            QStringList idList = FeatureDB::getInstance()->getFeatureIDs(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
             Q_FOREACH (auto id, idList)
             {
                 FeatureDB::getInstance()->deleteFeature(id);
@@ -148,7 +148,7 @@ void UKeyFTDevice::bindingUKey()
     QString featureID = QCryptographicHash::hash(keyFeature, QCryptographicHash::Md5).toHex();
     DeviceInfo deviceInfo = this->deviceInfo();
 
-    if (FeatureDB::getInstance()->addFeature(featureID, keyFeature, deviceInfo))
+    if (FeatureDB::getInstance()->addFeature(featureID, keyFeature, deviceInfo,deviceType()))
     {
         notifyUKeyEnrollProcess(ENROLL_PROCESS_SUCCESS, SAR_OK, featureID);
     }
@@ -162,7 +162,7 @@ void UKeyFTDevice::bindingUKey()
 bool UKeyFTDevice::isExistPublicKey()
 {
     DeviceInfo deviceInfo = this->deviceInfo();
-    auto features = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct);
+    auto features = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct,deviceType());
     if (features.count() != 0)
     {
         return true;
@@ -250,7 +250,7 @@ void UKeyFTDevice::doingIdentifyStart(const QString &value)
     DeviceInfo deviceInfo = this->deviceInfo();
     if (m_identifyIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct);
+        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
     }
     else
     {

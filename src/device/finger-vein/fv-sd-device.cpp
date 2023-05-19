@@ -358,7 +358,7 @@ void FVSDDevice::enrollTemplateMerge()
         QString id = QCryptographicHash::hash(mergedTemplate, QCryptographicHash::Md5).toHex();
 
         DeviceInfo deviceInfo = this->deviceInfo();
-        bool save = FeatureDB::getInstance()->addFeature(id, mergedTemplate, deviceInfo);
+        bool save = FeatureDB::getInstance()->addFeature(id, mergedTemplate, deviceInfo, deviceType());
         if (save)
         {
             notifyEnrollProcess(ENROLL_PROCESS_SUCCESS, id);
@@ -397,7 +397,7 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
     DeviceInfo deviceInfo = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct);
+        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct,deviceType());
     }
     else
     {

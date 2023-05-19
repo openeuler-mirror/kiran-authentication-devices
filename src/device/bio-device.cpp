@@ -36,7 +36,7 @@ void BioDevice::doingEnrollStart(const QString &extraInfo)
 {
     KLOG_DEBUG() << "biological information enroll start";
     // 获取当前保存的特征模板，判断是否达到最大数目
-    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct);
+    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct,deviceType());
     if (saveList.count() == TEMPLATE_MAX_NUMBER)
     {
         QString message = tr("feature has reached the upper limit of %1").arg(TEMPLATE_MAX_NUMBER);
@@ -144,7 +144,6 @@ void BioDevice::handleAcquiredFeature()
         acquireFeatureFail();
         return;
     }
-
     QByteArray feature = m_futureWatcher->result();
     if (feature.isEmpty())
     {
@@ -163,6 +162,7 @@ void BioDevice::handleAcquiredFeature()
     default:
         break;
     }
+    
 }
 
 QByteArrayList BioDevice::enrollTemplatesFromCache()

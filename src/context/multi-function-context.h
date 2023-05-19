@@ -12,18 +12,18 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 #pragma once
-
-#include <QObject>
+#include "context/context.h"
+#include "kiran-auth-device-i.h"
 
 namespace Kiran
 {
-class BDriver : public QObject
+class AuthDevice;
+class MultiFunctionContext : public Context
 {
-    Q_OBJECT
 public:
-    explicit BDriver(QObject *parent = nullptr);
-    virtual ~BDriver(){};
-
-Q_SIGNALS:
+    explicit MultiFunctionContext(QObject *parent = nullptr);
+    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct) override {return nullptr;};
+    AuthDeviceList createDevices(const QString& idVendor, const QString& idProduct);
+    AuthDevicePtr createIriStarDevice(const QString& idVendor, const QString& idProduct,DeviceType deviceType);
 };
 }  // namespace Kiran

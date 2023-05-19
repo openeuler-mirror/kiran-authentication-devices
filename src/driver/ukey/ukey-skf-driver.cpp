@@ -147,19 +147,6 @@ UKeySKFDriver::~UKeySKFDriver()
     }
 }
 
-QString UKeySKFDriver::getName()
-{
-    return QString();
-}
-QString UKeySKFDriver::getFullName()
-{
-    return QString();
-}
-quint16 UKeySKFDriver::getDriverId()
-{
-    return 0;
-}
-
 bool UKeySKFDriver::loadLibrary(QString libPath)
 {
     if (!QFile::exists(UKEY_DEFAULT_CONFIG))

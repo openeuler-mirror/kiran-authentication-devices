@@ -47,8 +47,9 @@ public:
     QDBusObjectPath getObjectPath() { return m_objectPath; };
     QString deviceID() { return m_deviceID; };
     QString deviceDriver() { return m_deviceDriver; };
-    int deviceType() { return m_deviceType; };
-    int deviceStatus() { return m_deviceStatus; };
+
+    DeviceType deviceType() { return m_deviceType; };
+    DeviceStatus deviceStatus() { return m_deviceStatus; };
     QString deviceName() { return m_deviceName; };
     DeviceInfo deviceInfo();
 
@@ -96,8 +97,10 @@ protected:
 private:
     QString m_deviceDriver;
     QString m_deviceID;
-    int m_deviceType;
-    int m_deviceStatus;
+
+    DeviceType m_deviceType;
+    DeviceStatus m_deviceStatus;
+
     QString m_deviceName;
     QString m_idVendor;
     QString m_idProduct;
