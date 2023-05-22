@@ -150,7 +150,7 @@ FVSDDevice::~FVSDDevice()
         acquireFeatureStop();
         m_driverLib->TGCloseDev();
     }
-    
+
     if (m_libComHandle)
     {
         dlclose(m_libComHandle);
@@ -239,10 +239,12 @@ QByteArray FVSDDevice::acquireFeature()
     {
         int voice = (0 == m_enrollTemplates.count()) ? VOICE_PLS_PUT_SOFTLY : VOICE_PLS_REPUT;
         m_driverLib->TGPlayDevVoice(voice);
-        KLOG_DEBUG() << "Please put your finger in";
     }
     else
+    {
         m_driverLib->TGPlayDevVoice(VOICE_PLS_PUT_SOFTLY);
+    }
+
     // 采集指静脉图像
     int ret = m_driverLib->TGGetDevImage(img, IMAGE_TIME_OUT);
     KLOG_DEBUG() << "Collecting digital vein images:" << ret;
@@ -397,7 +399,7 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
     DeviceInfo deviceInfo = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct,deviceType());
+        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
     }
     else
     {
@@ -495,31 +497,31 @@ void FVSDDevice::notifyEnrollProcess(EnrollProcess process, const QString &featu
     {
     case ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("Finger vein image not obtained");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_RETRY, message);
         break;
     case ENROLL_PROCESS_PASS:
-        message = tr("Partial finger vein feature entry");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_RESULT_PASS, message);
+        message = tr("Partial finger vein feature entry,please continue to place your finger");
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_STATUS_PASS, message);
         break;
     case ENROLL_PROCESS_REPEATED_ENROLL:
         message = tr("The finger vein has been enrolled");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE:
         message = tr("Please place the same finger!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_STATUS_RETRY, message);
         break;
     case ENROLL_PROCESS_MEGER_FAIL:
         message = tr("Finger vein template merged failed");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_SUCCESS:
         message = tr("Successed save feature");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_RESULT_COMPLETE, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_STATUS_COMPLETE, message);
         break;
     case ENROLL_PROCESS_SAVE_FAIL:
         message = tr("Save Feature Failed!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE_AFTER_MERGED:
         break;
@@ -546,17 +548,17 @@ void FVSDDevice::notifyIdentifyProcess(IdentifyProcess process, const QString &f
     {
     case IDENTIFY_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("timeout, acquire finger vein fail!");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_RETRY, message);
         break;
     case IDENTIFY_PROCESS_MACTCH:
         message = tr("Feature Match");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_MATCH, message);
         m_driverLib->TGSetDevLed(1, 0, 1);                 // 绿灯亮
         m_driverLib->TGPlayDevVoice(VOICE_IDENT_SUCCESS);  // 语音:认证成功
         break;
     case IDENTIFY_PROCESS_NO_MATCH:
         message = tr("Feature not match, place again");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_NOT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_NOT_MATCH, message);
         m_driverLib->TGSetDevLed(1, 1, 0);
         m_driverLib->TGPlayDevVoice(VOICE_IDENT_FAIL);
         break;

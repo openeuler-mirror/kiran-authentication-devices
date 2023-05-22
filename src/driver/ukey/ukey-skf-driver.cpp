@@ -295,43 +295,26 @@ ULONG UKeySKFDriver::devAuth(DEVHANDLE devHandle)
     return ulReval;
 }
 
-HAPPLICATION UKeySKFDriver::onOpenApplication(DEVHANDLE devHandle, LPSTR szAppName)
+ULONG UKeySKFDriver::onOpenApplication(DEVHANDLE devHandle, LPSTR szAppName,HAPPLICATION *appHandle)
 {
-    HAPPLICATION phApplication = nullptr;
-    ULONG ret = m_driverLib->SKF_OpenApplication(devHandle, szAppName, &phApplication);
-    if (ret != SAR_OK)
-    {
-        KLOG_DEBUG() << "open Application failed:" << getErrorReason(ret);
-        return nullptr;
-    }
-    return phApplication;
+    ULONG ret = m_driverLib->SKF_OpenApplication(devHandle, szAppName, appHandle);
+    return ret;
 }
 
-HCONTAINER UKeySKFDriver::onOpenContainer(HAPPLICATION appHandle, const QString &pin, QString containerName, ULONG *retryCount)
+ULONG UKeySKFDriver::onOpenContainer(HAPPLICATION appHandle, const QString &pin, QString containerName, ULONG *retryCount, HCONTAINER *containerHandle)
 {
     QByteArray byteArray = pin.toLatin1();
     unsigned char *szPIN = (unsigned char *)byteArray.data();
     ULONG ret = m_driverLib->SKF_VerifyPIN(appHandle, USER_TYPE, szPIN, retryCount);
-    if (ret == SAR_OK)
-    {
-        HCONTAINER containerHandle = nullptr;
-        ret = m_driverLib->SKF_OpenContainer(appHandle, (LPSTR)containerName.data(), &containerHandle);
-        if (ret == SAR_OK)
-        {
-            KLOG_DEBUG() << "open container success";
-            return containerHandle;
-        }
-        else
-        {
-            KLOG_ERROR() << "open container failed:" << getErrorReason(ret);
-        }
-    }
-    else
+    if (ret != SAR_OK)
     {
         KLOG_DEBUG() << "Verify PIN failed:" << getErrorReason(ret);
         KLOG_DEBUG() << "Retry Count:" << retryCount;
+        return ret;
     }
-    return nullptr;
+
+    ret = m_driverLib->SKF_OpenContainer(appHandle, (LPSTR)containerName.data(), containerHandle);
+    return ret;
 }
 
 void UKeySKFDriver::closeApplication(HAPPLICATION appHandle)
@@ -348,7 +331,7 @@ void UKeySKFDriver::disConnectDev(DEVHANDLE devHandle)
     m_driverLib->SKF_DisConnectDev(devHandle);
 }
 
-HAPPLICATION UKeySKFDriver::createApplication(DEVHANDLE devHandle, QString pin, QString appName)
+ULONG UKeySKFDriver::createApplication(DEVHANDLE devHandle, QString pin, QString appName,HAPPLICATION *appHandle)
 {
     QByteArray pinArray = pin.toLatin1();
     unsigned char *userPin = (unsigned char *)pinArray.data();
@@ -360,40 +343,23 @@ HAPPLICATION UKeySKFDriver::createApplication(DEVHANDLE devHandle, QString pin, 
     QByteArray byteArray = defaultAdminPin.toLatin1();
     unsigned char *adminPIn = (unsigned char *)byteArray.data();
 
-    HAPPLICATION appHandle = nullptr;
     ULONG ulReval = m_driverLib->SKF_CreateApplication(devHandle, szAppName, adminPIn,
                                                        ADMIN_PIN_RETRY_COUNT, userPin, USER_PIN_RETRY_COUNT,
-                                                       SECURE_USER_ACCOUNT, &appHandle);
-    ULONG retryCount;
-    if (ulReval != SAR_OK)
-    {
-        KLOG_ERROR() << "create application failed:" << getErrorReason(ulReval);
-        return nullptr;
-    }
-
-    return appHandle;
+                                                       SECURE_USER_ACCOUNT, appHandle);
+    return ulReval;
 }
 
-HCONTAINER UKeySKFDriver::createContainer(HAPPLICATION appHandle, QString pin, QString containerName, ULONG *retryCount)
+ULONG UKeySKFDriver::createContainer(HAPPLICATION appHandle, QString pin, QString containerName, ULONG *retryCount,HCONTAINER *containerHandle)
 {
     QByteArray byteArray = pin.toLatin1();
     unsigned char *userPin = (unsigned char *)byteArray.data();
     ULONG ulReval = m_driverLib->SKF_VerifyPIN(appHandle, USER_TYPE, userPin, retryCount);
     if (ulReval != SAR_OK)
     {
-        KLOG_ERROR() << "verifyPin failed:" << getErrorReason(ulReval);
-        return nullptr;
+        return ulReval;
     }
-
-    HCONTAINER containerHandle = nullptr;
-    ulReval = m_driverLib->SKF_CreateContainer(appHandle, (LPSTR)containerName.data(), &containerHandle);
-    if (ulReval != SAR_OK)
-    {
-        KLOG_ERROR() << "create container failed:" << getErrorReason(ulReval);
-        return nullptr;
-    }
-    KLOG_DEBUG() << "create new application and container success";
-    return containerHandle;
+    ulReval = m_driverLib->SKF_CreateContainer(appHandle, (LPSTR)containerName.data(), containerHandle);
+    return ulReval;
 }
 
 ULONG UKeySKFDriver::genECCKeyPair(HCONTAINER containerHandle, ECCPUBLICKEYBLOB *pBlob)

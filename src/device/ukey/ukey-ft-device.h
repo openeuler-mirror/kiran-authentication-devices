@@ -40,7 +40,7 @@ private:
     void identifyKeyFeature(QByteArray keyFeature);
     
     void bindingUKey();
-    ECCPUBLICKEYBLOB genKeyPair();
+    ULONG genKeyPair(ECCPUBLICKEYBLOB *publicKey);
     bool isExistPublicKey();
     bool isExistsApplication(const QString &appName);
 

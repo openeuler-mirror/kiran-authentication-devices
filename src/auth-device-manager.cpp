@@ -108,7 +108,6 @@ QString AuthDeviceManager::GetDriversByType(int device_type)
 {
     QJsonDocument jsonDoc;
     QJsonArray jsonArray;
-
     QSettings confSettings(DRIVERS_CONF, QSettings::NativeFormat);
     QStringList driverList = confSettings.childGroups();
     Q_FOREACH (auto driver, driverList)
@@ -116,21 +115,30 @@ QString AuthDeviceManager::GetDriversByType(int device_type)
         confSettings.beginGroup(driver);
         QVariant varEnable = confSettings.value("Enable");
         QVariant varType = confSettings.value("Type");
-        bool enable;
-        if (varEnable.isValid() && (varEnable.toString() == "true"))
-            enable = true;
-        else
-            enable = false;
+        bool enable = (varEnable.isValid() && (varEnable.toString() == "true")) ? true : false;
 
-        int type = (varType.isValid()) ? confSettings.value("Type").toInt() : -1;
+        QList<int> types;
+        QStringList typeStringList;
+        if (varType.isValid())
+        {
+            typeStringList = varType.toStringList();
+        }
+
+        Q_FOREACH (auto typeString, typeStringList)
+        {
+            types << typeString.toInt();
+        }
         confSettings.endGroup();
 
-        if (type == device_type)
+        Q_FOREACH (auto type, types)
         {
-            QJsonObject jsonObj{
-                {"driverName", driver},
-                {"enable", enable}};
-            jsonArray.append(jsonObj);
+            if (type == device_type)
+            {
+                QJsonObject jsonObj{
+                    {"driverName", driver},
+                    {"enable", enable}};
+                jsonArray.append(jsonObj);
+            }
         }
     }
     jsonDoc.setArray(jsonArray);

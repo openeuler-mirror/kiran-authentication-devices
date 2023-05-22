@@ -86,7 +86,7 @@ private Q_SLOTS:
 
 Q_SIGNALS:
     void addFeature();
-    void featureExist();
+    void featureExist(const QString &featureID);
 
     void enrollProcess(EnrollProcess process, DeviceType deviceType, const QString &featureID = QString());
     void identifyProcess(IdentifyProcess process, DeviceType deviceType, const QString &featureID = QString());
@@ -101,11 +101,13 @@ private:
 
     QByteArray m_leftEyeFeatureCache;
     QByteArray m_rightEyeFeatureCache;
+    
+    QList<QByteArray> m_identifyFeatureCache;
 
-    int m_deviceStatus;
     // 当前算法类型
     std::string m_algorithmType;
     int m_currentDeviceType = -1;
+    int m_deviceStatus;
 
     QString m_idVendor;
     QString m_idProduct;

@@ -32,29 +32,33 @@ extern "C"
 #define AUTH_DEVICE_JSON_KEY_FEATURE_IDS "feature_ids"
 
     // 录入结果
-    enum EnrollResult
+    enum EnrollStatus
     {
         // 录入完成
-        ENROLL_RESULT_COMPLETE,
+        ENROLL_STATUS_COMPLETE,
         // 录入失败
-        ENROLL_RESULT_FAIL,
+        ENROLL_STATUS_FAIL,
         // 录入阶段性完成
-        ENROLL_RESULT_PASS,
+        ENROLL_STATUS_PASS,
         // 因为扫描质量或者用户扫描过程中发生的问题引起
-        ENROLL_RESULT_RETRY,
+        ENROLL_STATUS_RETRY,
         // 重复录入同一特征
-        ENROLL_RESULT_REPEATED
+        ENROLL_STATUS_REPEATED,
+        // 正常录入中，用来传递消息，不涉及状态改变
+        ENROLL_STATUS_NORMAL
     };
 
     // 识别结果
-    enum IdentifyResult
+    enum IdentifyStatus
     {
         // 认证失败
-        IDENTIFY_RESULT_NOT_MATCH,
+        IDENTIFY_STATUS_NOT_MATCH,
         // 认证成功
-        IDENTIFY_RESULT_MATCH,
+        IDENTIFY_STATUS_MATCH,
         // 因为扫描质量或者用户扫描过程中发生的问题导致认证不成功
-        IDENTIFY_RESULT_RETRY,
+        IDENTIFY_STATUS_RETRY,
+        // 正常识别中，用来传递消息，不涉及状态改变
+        IDENTIFY_STATUS_NORMAL
     };
 
     // 设备类型

@@ -471,36 +471,36 @@ void FPZKDevice::notifyEnrollProcess(EnrollProcess process, const QString& featu
     {
     case ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("acquire fingerprint fail!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_PASS:
-        message = tr("Partial fingerprint feature entry");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_RESULT_PASS, message);
+        message = tr("Partial fingerprint feature entry,please continue to press your fingers");
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_STATUS_PASS, message);
         break;
     case ENROLL_PROCESS_REPEATED_ENROLL:
         message = tr("The fingerprint has been enrolled");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE:
         message = tr("Please place the same finger!");
         KLOG_DEBUG() << message;
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_STATUS_RETRY, message);
         break;
     case ENROLL_PROCESS_MEGER_FAIL:
         message = tr("Failed to enroll fingerprint, please enroll again");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_SUCCESS:
         message = tr("Successed save finger");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_RESULT_COMPLETE, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_STATUS_COMPLETE, message);
         break;
     case ENROLL_PROCESS_SAVE_FAIL:
         message = tr("Save Finger Failed!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE_AFTER_MERGED:
         message = tr("Failed to enroll fingerprint, please enroll again");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     default:
         break;
@@ -527,15 +527,15 @@ void FPZKDevice::notifyIdentifyProcess(IdentifyProcess process, const QString& f
         break;
     case IDENTIFY_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("acquire fingerprint fail!");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_RESULT_NOT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_NOT_MATCH, message);
         break;
     case IDENTIFY_PROCESS_MACTCH:
         message = tr("Fingerprint match");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_MATCH, message);
         break;
     case IDENTIFY_PROCESS_NO_MATCH:
         message = tr("Fingerprint not match, place again");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_NOT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_NOT_MATCH, message);
         break;
     default:
         break;

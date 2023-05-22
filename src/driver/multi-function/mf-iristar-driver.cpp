@@ -117,7 +117,7 @@ MFIriStarDriver::MFIriStarDriver(QObject *parent) : BDriver{parent}
     m_idProduct = IRISTAR_ID_PRODUCT;
 
     connect(this, &MFIriStarDriver::addFeature, this, &MFIriStarDriver::onStartEnroll);
-    connect(this, &MFIriStarDriver::featureExist, this, [this]
+    connect(this, &MFIriStarDriver::featureExist, this, [this](const QString &featureID)
             {
                 //重复录入
                 if(deviceStatus() != DEVICE_STATUS_DOING_ENROLL)
@@ -126,23 +126,22 @@ MFIriStarDriver::MFIriStarDriver(QObject *parent) : BDriver{parent}
                 } 
                 if(m_algorithmType == ALGORITHM_TYPE_IRIS)
                 {
-                    Q_EMIT enrollProcess(ENROLL_PROCESS_REPEATED_ENROLL,DEVICE_TYPE_Iris);
+                    Q_EMIT enrollProcess(ENROLL_PROCESS_REPEATED_ENROLL,DEVICE_TYPE_Iris,featureID);
                 }
                 else 
                 {
-                    Q_EMIT enrollProcess(ENROLL_PROCESS_REPEATED_ENROLL,DEVICE_TYPE_Face);
-                }
-                stop(); });
+                    Q_EMIT enrollProcess(ENROLL_PROCESS_REPEATED_ENROLL,DEVICE_TYPE_Face,featureID);
+                } });
 }
 
 MFIriStarDriver::~MFIriStarDriver()
 {
-    KLOG_DEBUG() << "~MFIriStarDriver";
-    KLOG_DEBUG() << "m_driverLib->isLoaded:" << m_driverLib->isLoaded;
-    KLOG_DEBUG() << "m_irsHandle:" << m_irsHandle;
     if (m_driverLib->isLoaded && m_irsHandle)
     {
-        m_driverLib->IRS_releaseInstance(m_irsHandle);
+        bool enable = false;
+        m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_IRIS_LIGHT, &enable, sizeof(enable));
+        m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_CANCEL_OPR, NULL, 0);  // 停止当前正在进行的流程
+        m_driverLib->IRS_releaseInstance(m_irsHandle);    
     }
 
     if (m_libHandle)
@@ -169,7 +168,6 @@ bool MFIriStarDriver::initDriver()
     // FIXME:由于是使用静态方法实现，但生成多个类的实例对象时，第一个对象的c_func指针会被第二个对象的c_func指针覆盖
     Callback<void(IRS_Results *)>::func = std::bind(&MFIriStarDriver::resultCallback, this, std::placeholders::_1);
     void (*c_func)(IRS_Results *) = static_cast<decltype(c_func)>(Callback<void(IRS_Results *)>::callback);
-    KLOG_DEBUG() << "(void *)c_func:" << (void *)c_func;
 
     // 设置结果回调函数
     int retVal = m_driverLib->IRS_control(m_irsHandle,
@@ -345,6 +343,7 @@ void MFIriStarDriver::stop()
     KLOG_DEBUG() << QString("Stop the current process %1,retVal:%2").arg(0 == retVal ? "success" : "failed").arg(retVal);
     setDeviceStatus(DEVICE_STATUS_IDLE);
     m_algorithmType.clear();
+    m_identifyFeatureCache.clear();
     m_currentDeviceType = -1;
 }
 
@@ -395,6 +394,7 @@ int MFIriStarDriver::startIdentify(QStringList featureIDs)
     }
 
     int retVal = 0;
+    m_identifyFeatureCache = saveList;
     // 识别类型，只支持I/F，其中I表示虹膜，F表示人脸
     if (m_algorithmType == ALGORITHM_TYPE_IRIS)
     {
@@ -615,7 +615,6 @@ void MFIriStarDriver::handleIrisEnrolled(IRS_Results *results)
 
     m_leftEyeFeatureCache.clear();
     m_rightEyeFeatureCache.clear();
-    stop();
 }
 
 void MFIriStarDriver::handleEnrollingFailed(IRS_Results *results)
@@ -634,23 +633,28 @@ void MFIriStarDriver::handleEnrollingFailed(IRS_Results *results)
 void MFIriStarDriver::handleRecognized(IRS_Results *results)
 {
     KLOG_DEBUG() << QString("%1 Recognized Matched Score:").arg((m_algorithmType == ALGORITHM_TYPE_IRIS) ? "Iris" : "Face")
-                 << results->matchedScore;
+                 << results->matchedScore
+                 << "Matched Index:" << results->matchedIndex;
+
+    auto feature = m_identifyFeatureCache.value(results->matchedIndex);
+    QString featureID = FeatureDB::getInstance()->getFeatureID(feature);
+
     if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
     {
-        Q_EMIT this->featureExist();
+        Q_EMIT this->featureExist(featureID);
     }
     else
     {
+        
         if (m_algorithmType == ALGORITHM_TYPE_IRIS)
         {
-            Q_EMIT identifyProcess(IDENTIFY_PROCESS_MACTCH, DEVICE_TYPE_Iris, "");
+            Q_EMIT identifyProcess(IDENTIFY_PROCESS_MACTCH, DEVICE_TYPE_Iris, featureID);
         }
         else if (m_algorithmType == ALGORITHM_TYPE_FACE)
         {
-            Q_EMIT identifyProcess(IDENTIFY_PROCESS_MACTCH, DEVICE_TYPE_Face, "");
+            Q_EMIT identifyProcess(IDENTIFY_PROCESS_MACTCH, DEVICE_TYPE_Face, featureID);
         }
     }
-    stop();
 }
 
 void MFIriStarDriver::handleRecognizingFailed(IRS_Results *results)
@@ -671,28 +675,28 @@ void MFIriStarDriver::handleRecognizingFailed(IRS_Results *results)
         {
             Q_EMIT identifyProcess(IDENTIFY_PROCESS_NO_MATCH, DEVICE_TYPE_Face);
         }
-        stop();
     }
 }
 
 void MFIriStarDriver::handleFaceEnrolled(IRS_Results *results)
 {
-    if (0 < results->faceData.image.dataLen && results->faceData.image.data)
-    {  // 人脸注册成功
-        QByteArray faceFeature((char *)results->faceData.featureData, results->faceData.featureDataLen);
-        KLOG_DEBUG() << "faceFeature:" << faceFeature;
-
-        QString featureID = QCryptographicHash::hash(faceFeature, QCryptographicHash::Md5).toHex();
-        DeviceInfo deviceInfo;
-        deviceInfo.idVendor = m_idVendor;
-        deviceInfo.idProduct = m_idProduct;
-        bool isSaved = FeatureDB::getInstance()->addFeature(featureID, faceFeature, deviceInfo, (DeviceType)m_currentDeviceType);
-        KLOG_DEBUG() << "m_isSaved:" << isSaved;
-        KLOG_DEBUG() << "face enrolled,featureID" << featureID;
-
-        Q_EMIT enrollProcess(ENROLL_PROCESS_SUCCESS, DEVICE_TYPE_Face, featureID);
-        stop();
+    if (results->faceData.image.dataLen <= 0 || !(results->faceData.image.data))
+    {
+        Q_EMIT enrollProcess(ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL,DEVICE_TYPE_Face);
+        return;
     }
+    QByteArray faceFeature((char *)results->faceData.featureData, results->faceData.featureDataLen);
+    KLOG_DEBUG() << "faceFeature:" << faceFeature;
+
+    QString featureID = QCryptographicHash::hash(faceFeature, QCryptographicHash::Md5).toHex();
+    DeviceInfo deviceInfo;
+    deviceInfo.idVendor = m_idVendor;
+    deviceInfo.idProduct = m_idProduct;
+    bool isSaved = FeatureDB::getInstance()->addFeature(featureID, faceFeature, deviceInfo, (DeviceType)m_currentDeviceType);
+    KLOG_DEBUG() << "m_isSaved:" << isSaved;
+    KLOG_DEBUG() << "face enrolled,featureID" << featureID;
+
+    Q_EMIT enrollProcess(ENROLL_PROCESS_SUCCESS, DEVICE_TYPE_Face, featureID);
 }
 
 void MFIriStarDriver::imageCallback(IRS_Image *irsImage)

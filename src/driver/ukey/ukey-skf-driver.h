@@ -33,15 +33,15 @@ public:
     QString enumApplication(DEVHANDLE devHandle);
 
     ULONG devAuth(DEVHANDLE devHandle);
-    HAPPLICATION onOpenApplication(DEVHANDLE hDev, LPSTR szAppName);
-    HCONTAINER onOpenContainer(HAPPLICATION appHandle,const QString &pin,QString containerName,ULONG *retryCount);
+    ULONG onOpenApplication(DEVHANDLE hDev, LPSTR szAppName, HAPPLICATION *appHandle);
+    ULONG onOpenContainer(HAPPLICATION appHandle,const QString &pin,QString containerName,ULONG *retryCount,HCONTAINER *containerHandle);
 
     void closeApplication(HAPPLICATION appHandle);
     void closeContainer(HCONTAINER containerHandle);
     void disConnectDev(DEVHANDLE devHandle);
 
-    HAPPLICATION createApplication(DEVHANDLE devHandle,QString pin,QString appName);
-    HCONTAINER createContainer(HAPPLICATION appHandle, QString pin,QString  containerName,ULONG *retryCount);
+    ULONG createApplication(DEVHANDLE devHandle,QString pin,QString appName , HAPPLICATION *appHandle);
+    ULONG createContainer(HAPPLICATION appHandle, QString pin,QString  containerName,ULONG *retryCount, HCONTAINER *containerHandle);
 
     ULONG genECCKeyPair(HCONTAINER containerHandle,ECCPUBLICKEYBLOB *pBlob);
 

@@ -36,11 +36,11 @@ void BioDevice::doingEnrollStart(const QString &extraInfo)
 {
     KLOG_DEBUG() << "biological information enroll start";
     // 获取当前保存的特征模板，判断是否达到最大数目
-    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct,deviceType());
+    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct, deviceType());
     if (saveList.count() == TEMPLATE_MAX_NUMBER)
     {
         QString message = tr("feature has reached the upper limit of %1").arg(TEMPLATE_MAX_NUMBER);
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         KLOG_ERROR() << message;
         internalStopEnroll();
         return;
@@ -48,6 +48,21 @@ void BioDevice::doingEnrollStart(const QString &extraInfo)
     m_doAcquire = true;
     auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
     m_futureWatcher->setFuture(future);
+
+    QString message;
+    switch (deviceType())
+    {
+    case DEVICE_TYPE_FingerPrint:
+        message = tr("Please press your finger");
+        break;
+    case DEVICE_TYPE_FingerVein:
+        message = tr("Please put your finger in");
+        break;
+    default:
+        break;
+    }
+
+    m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_NORMAL, message);
 }
 
 void BioDevice::doingIdentifyStart(const QString &value)
@@ -56,6 +71,20 @@ void BioDevice::doingIdentifyStart(const QString &value)
     m_doAcquire = true;
     auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
     m_futureWatcher->setFuture(future);
+
+    QString message;
+    switch (deviceType())
+    {
+    case DEVICE_TYPE_FingerPrint:
+        message = tr("Please press your finger");
+        break;
+    case DEVICE_TYPE_FingerVein:
+        message = tr("Please put your finger in");
+        break;
+    default:
+        break;
+    }
+    m_dbusAdaptor->IdentifyStatus("", ENROLL_STATUS_NORMAL, message);
 }
 
 void BioDevice::internalStopEnroll()
@@ -140,7 +169,7 @@ void BioDevice::handleAcquiredFeature()
     auto future = m_futureWatcher->future();
     if (!future.isResultReadyAt(0))
     {
-        KLOG_DEBUG()  <<  "acquired feature is not available";
+        KLOG_DEBUG() << "acquired feature is not available";
         acquireFeatureFail();
         return;
     }
@@ -162,7 +191,6 @@ void BioDevice::handleAcquiredFeature()
     default:
         break;
     }
-    
 }
 
 QByteArrayList BioDevice::enrollTemplatesFromCache()
