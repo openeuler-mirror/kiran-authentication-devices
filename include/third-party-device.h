@@ -20,7 +20,10 @@ namespace Kiran
 #define ZK_ID_VENDOR "1b55"
 #define SD_ID_VENDOR "05e3"
 #define FT_ID_VENDOR "096e"
+#define IRISTAR_ID_VENDOR "04b4"
+#define IRISTAR_ID_PRODUCT "00f3"
 
+//TODO:obsolete
 static const struct ThirdPartyDeviceSupported
 {
     //设备类型，必填
@@ -36,7 +39,8 @@ static const struct ThirdPartyDeviceSupported
 }ThirdPartyDeviceSupportedTable[] = {
     {DEVICE_TYPE_FingerPrint,"1b55","0120","","ZK"},
     {DEVICE_TYPE_FingerVein,"05e3","0608","","SD"},
-    {DEVICE_TYPE_UKey,"096e","0309","","FT"}
+    {DEVICE_TYPE_UKey,"096e","0309","","FT"},
+    {DEVICE_TYPE_Iris,"04b4","00f3","","IS"}
 };
 
 }

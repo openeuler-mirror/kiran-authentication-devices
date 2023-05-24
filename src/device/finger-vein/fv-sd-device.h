@@ -25,14 +25,14 @@ enum ExtractFeatureMode
     EXTRACT_FEATURE_VERIFY     // 提取的特征验证时使用
 };
 
-struct DriverLib;
+struct FVSDDriverLib;
 class FVSDDevice : public BioDevice
 {
     Q_OBJECT
 public:
     explicit FVSDDevice(QObject *parent = nullptr);
     ~FVSDDevice();
-    bool initDevice() override;
+    bool initDriver() override;
 
 private:
     bool loadLib();
@@ -55,7 +55,7 @@ private:
     QByteArray getFeatureFromImage(QByteArray image, ExtractFeatureMode mode);
 
 private:
-    QSharedPointer<DriverLib> m_driverLib;
+    QSharedPointer<FVSDDriverLib> m_driverLib;
     Handle m_libProcessHandle;
     Handle m_libComHandle;
 };

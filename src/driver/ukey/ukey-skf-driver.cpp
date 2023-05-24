@@ -16,6 +16,7 @@
 #include <qt5-log-i.h>
 #include <QFile>
 #include <QSettings>
+#include "auth-enum.h"
 
 namespace Kiran
 {
@@ -66,9 +67,12 @@ extern "C"
     typedef ULONG (*SKF_DevAuth_Func)(DEVHANDLE hDev, BYTE *pbAuthData, ULONG ulLen);
     typedef ULONG (*SKF_DeleteApplication_Func)(DEVHANDLE hDev, LPSTR szAppName);
     typedef ULONG (*SKF_CreateContainer_Func)(HAPPLICATION hApplication, LPSTR szContainerName, HCONTAINER *phContainer);
+
+    typedef ULONG (*SKF_ChangePIN_Func)(HAPPLICATION hApplication, ULONG ulPINType, LPSTR szOldPin, LPSTR szNewPin, ULONG *pulRetryCount);
+    typedef ULONG (*SKF_UnblockPIN_Func)(HAPPLICATION hApplication, LPSTR szAdminPIN, LPSTR szNewUserPIN, ULONG *pulRetryCount);
 }
 
-struct DriverLib
+struct SKFDriverLib
 {
     SKF_EnumDev_Func SKF_EnumDev;
     SKF_ConnectDev_Func SKF_ConnectDev;
@@ -96,10 +100,50 @@ struct DriverLib
     SKF_DevAuth_Func SKF_DevAuth;
     SKF_DeleteApplication_Func SKF_DeleteApplication;
     SKF_CreateContainer_Func SKF_CreateContainer;
+    SKF_ChangePIN_Func SKF_ChangePIN;
+    SKF_UnblockPIN_Func SKF_UnblockPIN;
+
+    void loadSym(HANDLE libHandle)
+    {
+        this->SKF_EnumDev = (SKF_EnumDev_Func)dlsym(libHandle, "SKF_EnumDev");
+        this->SKF_ConnectDev = (SKF_ConnectDev_Func)dlsym(libHandle, "SKF_ConnectDev");
+        this->SKF_DisConnectDev = (SKF_DisConnectDev_Func)dlsym(libHandle, "SKF_DisConnectDev");
+        this->SKF_GetDevState = (SKF_GetDevState_Func)dlsym(libHandle, "SKF_GetDevState");
+        this->SKF_GetDevInfo = (SKF_GetDevInfo_Func)dlsym(libHandle, "SKF_GetDevInfo");
+        this->SKF_SetLabel = (SKF_SetLabel_Func)dlsym(libHandle, "SKF_SetLabel");
+        this->SKF_OpenApplication = (SKF_OpenApplication_Func)dlsym(libHandle, "SKF_OpenApplication");
+        this->SKF_VerifyPIN = (SKF_VerifyPIN_Func)dlsym(libHandle, "SKF_VerifyPIN");
+        this->SKF_OpenContainer = (SKF_OpenContainer_Func)dlsym(libHandle, "SKF_OpenContainer");
+        this->SKF_GenECCKeyPair = (SKF_GenECCKeyPair_Func)dlsym(libHandle, "SKF_GenECCKeyPair");
+        this->SKF_CloseContainer = (SKF_CloseContainer_Func)dlsym(libHandle, "SKF_CloseContainer");
+        this->SKF_CloseApplication = (SKF_CloseApplication_Func)dlsym(libHandle, "SKF_CloseApplication");
+        this->SKF_CreateApplication = (SKF_CreateApplication_Func)dlsym(libHandle, "SKF_CreateApplication");
+        this->SKF_EnumApplication = (SKF_EnumApplication_Func)dlsym(libHandle, "SKF_EnumApplication");
+        this->SKF_ExportPublicKey = (SKF_ExportPublicKey_Func)dlsym(libHandle, "SKF_ExportPublicKey");
+        this->SKF_Digest = (SKF_Digest_Func)dlsym(libHandle, "SKF_Digest");
+        this->SKF_DigestInit = (SKF_DigestInit_Func)dlsym(libHandle, "SKF_DigestInit");
+        this->SKF_ECCSignData = (SKF_ECCSignData_Func)dlsym(libHandle, "SKF_ECCSignData");
+        this->SKF_ECCVerify = (SKF_ECCVerify_Func)dlsym(libHandle, "SKF_ECCVerify");
+        this->SKF_GenRandom = (SKF_GenRandom_Func)dlsym(libHandle, "SKF_GenRandom");
+        this->SKF_SetSymmKey = (SKF_SetSymmKey_Func)dlsym(libHandle, "SKF_SetSymmKey");
+        this->SKF_EncryptInit = (SKF_EncryptInit_Func)dlsym(libHandle, "SKF_EncryptInit");
+        this->SKF_Encrypt = (SKF_Encrypt_Func)dlsym(libHandle, "SKF_Encrypt");
+        this->SKF_DevAuth = (SKF_DevAuth_Func)dlsym(libHandle, "SKF_DevAuth");
+        this->SKF_DeleteApplication = (SKF_DeleteApplication_Func)dlsym(libHandle, "SKF_DeleteApplication");
+        this->SKF_CreateContainer = (SKF_CreateContainer_Func)dlsym(libHandle, "SKF_CreateContainer");
+        this->SKF_ChangePIN = (SKF_ChangePIN_Func)dlsym(libHandle, "SKF_ChangePIN");
+        this->SKF_UnblockPIN = (SKF_UnblockPIN_Func)dlsym(libHandle, "SKF_UnblockPIN");
+
+        this->isLoaded = true;
+    }
+
+    bool isLoaded = false;
 };
 
-UKeySKFDriver::UKeySKFDriver(QObject *parent) : BDriver(parent)
+UKeySKFDriver::UKeySKFDriver(QObject *parent) : QObject(parent),
+                                                m_libHandle(nullptr)
 {
+    m_driverLib = QSharedPointer<SKFDriverLib>(new SKFDriverLib);
 }
 
 UKeySKFDriver::~UKeySKFDriver()
@@ -111,23 +155,11 @@ UKeySKFDriver::~UKeySKFDriver()
     }
 }
 
-QString UKeySKFDriver::getName()
-{
-    return QString();
-}
-QString UKeySKFDriver::getFullName()
-{
-    return QString();
-}
-quint16 UKeySKFDriver::getDriverId()
-{
-    return 0;
-}
-
 bool UKeySKFDriver::loadLibrary(QString libPath)
 {
     if (!QFile::exists(UKEY_DEFAULT_CONFIG))
     {
+        KLOG_ERROR() << "ukey-skf.conf not found";
         return false;
     }
 
@@ -138,42 +170,20 @@ bool UKeySKFDriver::loadLibrary(QString libPath)
         return false;
     }
 
-    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
-    m_driverLib->SKF_EnumDev = (SKF_EnumDev_Func)dlsym(m_libHandle, "SKF_EnumDev");
-    m_driverLib->SKF_ConnectDev = (SKF_ConnectDev_Func)dlsym(m_libHandle, "SKF_ConnectDev");
-    m_driverLib->SKF_DisConnectDev = (SKF_DisConnectDev_Func)dlsym(m_libHandle, "SKF_DisConnectDev");
-    m_driverLib->SKF_GetDevState = (SKF_GetDevState_Func)dlsym(m_libHandle, "SKF_GetDevState");
-    m_driverLib->SKF_GetDevInfo = (SKF_GetDevInfo_Func)dlsym(m_libHandle, "SKF_GetDevInfo");
-    m_driverLib->SKF_SetLabel = (SKF_SetLabel_Func)dlsym(m_libHandle, "SKF_SetLabel");
-    m_driverLib->SKF_OpenApplication = (SKF_OpenApplication_Func)dlsym(m_libHandle, "SKF_OpenApplication");
-    m_driverLib->SKF_VerifyPIN = (SKF_VerifyPIN_Func)dlsym(m_libHandle, "SKF_VerifyPIN");
-    m_driverLib->SKF_OpenContainer = (SKF_OpenContainer_Func)dlsym(m_libHandle, "SKF_OpenContainer");
-    m_driverLib->SKF_GenECCKeyPair = (SKF_GenECCKeyPair_Func)dlsym(m_libHandle, "SKF_GenECCKeyPair");
-    m_driverLib->SKF_CloseContainer = (SKF_CloseContainer_Func)dlsym(m_libHandle, "SKF_CloseContainer");
-    m_driverLib->SKF_CloseApplication = (SKF_CloseApplication_Func)dlsym(m_libHandle, "SKF_CloseApplication");
-    m_driverLib->SKF_CreateApplication = (SKF_CreateApplication_Func)dlsym(m_libHandle, "SKF_CreateApplication");
-    m_driverLib->SKF_EnumApplication = (SKF_EnumApplication_Func)dlsym(m_libHandle, "SKF_EnumApplication");
-    m_driverLib->SKF_ExportPublicKey = (SKF_ExportPublicKey_Func)dlsym(m_libHandle, "SKF_ExportPublicKey");
-    m_driverLib->SKF_Digest = (SKF_Digest_Func)dlsym(m_libHandle, "SKF_Digest");
-    m_driverLib->SKF_DigestInit = (SKF_DigestInit_Func)dlsym(m_libHandle, "SKF_DigestInit");
-    m_driverLib->SKF_ECCSignData = (SKF_ECCSignData_Func)dlsym(m_libHandle, "SKF_ECCSignData");
-    m_driverLib->SKF_ECCVerify = (SKF_ECCVerify_Func)dlsym(m_libHandle, "SKF_ECCVerify");
-    m_driverLib->SKF_GenRandom = (SKF_GenRandom_Func)dlsym(m_libHandle, "SKF_GenRandom");
-    m_driverLib->SKF_SetSymmKey = (SKF_SetSymmKey_Func)dlsym(m_libHandle, "SKF_SetSymmKey");
-    m_driverLib->SKF_EncryptInit = (SKF_EncryptInit_Func)dlsym(m_libHandle, "SKF_EncryptInit");
-    m_driverLib->SKF_Encrypt = (SKF_Encrypt_Func)dlsym(m_libHandle, "SKF_Encrypt");
-    m_driverLib->SKF_DevAuth = (SKF_DevAuth_Func)dlsym(m_libHandle, "SKF_DevAuth");
-    m_driverLib->SKF_DeleteApplication = (SKF_DeleteApplication_Func)dlsym(m_libHandle, "SKF_DeleteApplication");
-    m_driverLib->SKF_CreateContainer = (SKF_CreateContainer_Func)dlsym(m_libHandle, "SKF_CreateContainer");
+    m_driverLib->loadSym(m_libHandle);
 
     return true;
+}
+
+bool UKeySKFDriver::isLoaded()
+{
+    return m_driverLib->isLoaded;
 }
 
 DEVHANDLE UKeySKFDriver::connectDev()
 {
     ULONG ulBufSize = 0;
     ULONG ulReval = m_driverLib->SKF_EnumDev(TRUE, NULL, &ulBufSize);
-
     if (ulReval != SAR_OK)
     {
         KLOG_DEBUG() << "Enum Dev error:" << getErrorReason(ulReval);
@@ -209,6 +219,7 @@ DEVHANDLE UKeySKFDriver::connectDev()
     free(szNameList);
     return nullptr;
 }
+
 
 void UKeySKFDriver::deleteAllApplication(DEVHANDLE devHandle)
 {
@@ -293,43 +304,29 @@ ULONG UKeySKFDriver::devAuth(DEVHANDLE devHandle)
     return ulReval;
 }
 
-HAPPLICATION UKeySKFDriver::onOpenApplication(DEVHANDLE devHandle, LPSTR szAppName)
+ULONG UKeySKFDriver::onOpenApplication(DEVHANDLE devHandle, LPSTR szAppName, HAPPLICATION *appHandle)
 {
-    HAPPLICATION phApplication = nullptr;
-    ULONG ret = m_driverLib->SKF_OpenApplication(devHandle, szAppName, &phApplication);
-    if (ret != SAR_OK)
-    {
-        KLOG_DEBUG() << "open Application failed:" << getErrorReason(ret);
-        return nullptr;
-    }
-    return phApplication;
+    ULONG ret = m_driverLib->SKF_OpenApplication(devHandle, szAppName, appHandle);
+    return ret;
 }
 
-HCONTAINER UKeySKFDriver::onOpenContainer(HAPPLICATION appHandle, const QString &pin, QString containerName, ULONG *retryCount)
+ULONG UKeySKFDriver::onOpenContainer(HAPPLICATION appHandle, const QString &pin, QString containerName, ULONG *retryCount, HCONTAINER *containerHandle)
 {
     QByteArray byteArray = pin.toLatin1();
     unsigned char *szPIN = (unsigned char *)byteArray.data();
     ULONG ret = m_driverLib->SKF_VerifyPIN(appHandle, USER_TYPE, szPIN, retryCount);
-    if (ret == SAR_OK)
-    {
-        HCONTAINER containerHandle = nullptr;
-        ret = m_driverLib->SKF_OpenContainer(appHandle, (LPSTR)containerName.data(), &containerHandle);
-        if (ret == SAR_OK)
-        {
-            KLOG_DEBUG() << "open container success";
-            return containerHandle;
-        }
-        else
-        {
-            KLOG_ERROR() << "open container failed:" << getErrorReason(ret);
-        }
-    }
-    else
+    if (ret != SAR_OK)
     {
         KLOG_DEBUG() << "Verify PIN failed:" << getErrorReason(ret);
         KLOG_DEBUG() << "Retry Count:" << retryCount;
+        return ret;
     }
-    return nullptr;
+
+    QByteArray containerNameArray = containerName.toLatin1();
+    unsigned char *szContainerName = (unsigned char *)containerNameArray.data();
+
+    ret = m_driverLib->SKF_OpenContainer(appHandle, szContainerName, containerHandle);
+    return ret;
 }
 
 void UKeySKFDriver::closeApplication(HAPPLICATION appHandle)
@@ -346,7 +343,7 @@ void UKeySKFDriver::disConnectDev(DEVHANDLE devHandle)
     m_driverLib->SKF_DisConnectDev(devHandle);
 }
 
-HAPPLICATION UKeySKFDriver::createApplication(DEVHANDLE devHandle, QString pin, QString appName)
+ULONG UKeySKFDriver::createApplication(DEVHANDLE devHandle, QString pin, QString appName, HAPPLICATION *appHandle)
 {
     QByteArray pinArray = pin.toLatin1();
     unsigned char *userPin = (unsigned char *)pinArray.data();
@@ -358,40 +355,26 @@ HAPPLICATION UKeySKFDriver::createApplication(DEVHANDLE devHandle, QString pin, 
     QByteArray byteArray = defaultAdminPin.toLatin1();
     unsigned char *adminPIn = (unsigned char *)byteArray.data();
 
-    HAPPLICATION appHandle = nullptr;
     ULONG ulReval = m_driverLib->SKF_CreateApplication(devHandle, szAppName, adminPIn,
                                                        ADMIN_PIN_RETRY_COUNT, userPin, USER_PIN_RETRY_COUNT,
-                                                       SECURE_USER_ACCOUNT, &appHandle);
-    ULONG retryCount;
-    if (ulReval != SAR_OK)
-    {
-        KLOG_ERROR() << "create application failed:" << getErrorReason(ulReval);
-        return nullptr;
-    }
-
-    return appHandle;
+                                                       SECURE_USER_ACCOUNT, appHandle);
+    return ulReval;
 }
 
-HCONTAINER UKeySKFDriver::createContainer(HAPPLICATION appHandle, QString pin, QString containerName, ULONG *retryCount)
+ULONG UKeySKFDriver::createContainer(HAPPLICATION appHandle, QString pin, QString containerName, ULONG *retryCount, HCONTAINER *containerHandle)
 {
     QByteArray byteArray = pin.toLatin1();
     unsigned char *userPin = (unsigned char *)byteArray.data();
     ULONG ulReval = m_driverLib->SKF_VerifyPIN(appHandle, USER_TYPE, userPin, retryCount);
     if (ulReval != SAR_OK)
     {
-        KLOG_ERROR() << "verifyPin failed:" << getErrorReason(ulReval);
-        return nullptr;
+        return ulReval;
     }
 
-    HCONTAINER containerHandle = nullptr;
-    ulReval = m_driverLib->SKF_CreateContainer(appHandle, (LPSTR)containerName.data(), &containerHandle);
-    if (ulReval != SAR_OK)
-    {
-        KLOG_ERROR() << "create container failed:" << getErrorReason(ulReval);
-        return nullptr;
-    }
-    KLOG_DEBUG() << "create new application and container success";
-    return containerHandle;
+    QByteArray containerNameArray = containerName.toLatin1();
+    unsigned char *szContainerName = (unsigned char *)containerNameArray.data();
+    ulReval = m_driverLib->SKF_CreateContainer(appHandle, szContainerName, containerHandle);
+    return ulReval;
 }
 
 ULONG UKeySKFDriver::genECCKeyPair(HCONTAINER containerHandle, ECCPUBLICKEYBLOB *pBlob)
@@ -491,6 +474,56 @@ ULONG UKeySKFDriver::verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature
 
 end:
     getErrorReason(ulReval);
+    return ulReval;
+}
+
+ULONG UKeySKFDriver::changePin(DEVHANDLE devHandle, int userType, const QString &currentPin, const QString &newPin, ULONG *retryCount)
+{
+    HAPPLICATION appHandle = nullptr;
+    ULONG ulReval = onOpenApplication(devHandle, (LPSTR)UKEY_APP_NAME, &appHandle);
+    if (ulReval != SAR_OK)
+    {
+        KLOG_DEBUG() << "open Application failed:" << getErrorReason(ulReval);
+        return ulReval;
+    }
+    KLOG_DEBUG() << "open Application success";
+
+    QByteArray currentPinArray = currentPin.toLatin1();
+    unsigned char *szCurrentPIN = (unsigned char *)currentPinArray.data();
+
+    QByteArray newPinArray = newPin.toLatin1();
+    unsigned char *szNewPIN = (unsigned char *)newPinArray.data();
+
+    if (userType == ADMIN_TYPE)
+    {
+        ulReval = m_driverLib->SKF_ChangePIN(appHandle, ADMIN_TYPE, szCurrentPIN, szNewPIN, retryCount);
+    }
+    else if (userType == USER_TYPE)
+    {
+        ulReval = m_driverLib->SKF_ChangePIN(appHandle, USER_TYPE, szCurrentPIN, szNewPIN, retryCount);
+    }
+
+    return ulReval;
+}
+
+ULONG UKeySKFDriver::unblockPin(DEVHANDLE devHandle, const QString &adminPin, const QString &newUserPin, ULONG *retryCount)
+{
+    HAPPLICATION appHandle = nullptr;
+    ULONG ulReval = onOpenApplication(devHandle, (LPSTR)UKEY_APP_NAME, &appHandle);
+    if (ulReval != SAR_OK)
+    {
+        KLOG_DEBUG() << "open Application failed:" << getErrorReason(ulReval);
+        return ulReval;
+    }
+    KLOG_DEBUG() << "open Application success";
+
+    QByteArray adminPinArray = adminPin.toLatin1();
+    unsigned char *szAdminPin = (unsigned char *)adminPinArray.data();
+
+    QByteArray newUserPinArray = newUserPin.toLatin1();
+    unsigned char *szNewUserPIN = (unsigned char *)newUserPinArray.data();
+
+    ulReval = m_driverLib->SKF_UnblockPIN(appHandle, szAdminPin, szNewUserPIN, retryCount);
     return ulReval;
 }
 

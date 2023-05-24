@@ -16,21 +16,21 @@
 #include <QFutureWatcher>
 #include <QSharedPointer>
 #include "auth-enum.h"
-#include "fp-device.h"
+#include "device/bio-device.h"
 
 namespace Kiran
 {
 typedef void* HANDLE;
-struct DriverLib;
+struct FPZKDriverLib;
 
-class FPZKDevice : public FPDevice
+class FPZKDevice : public BioDevice
 {
     Q_OBJECT
 public:
     explicit FPZKDevice(QObject* parent = nullptr);
     ~FPZKDevice();
 
-    bool initDevice() override;
+    bool initDriver() override;
 
 private:
     bool loadLib();
@@ -62,6 +62,6 @@ private:
 private:
     Handle m_libHandle;
     Handle m_hDBCache;
-    QSharedPointer<DriverLib> m_driverLib;
+    QSharedPointer<FPZKDriverLib> m_driverLib;
 };
 }  // namespace Kiran

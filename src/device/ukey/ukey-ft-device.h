@@ -21,8 +21,6 @@
 
 namespace Kiran
 {
-struct DriverLib;
-
 class UKeyFTDevice : public AuthDevice
 {
     Q_OBJECT
@@ -30,7 +28,7 @@ public:
     explicit UKeyFTDevice(QObject *parent = nullptr);
     ~UKeyFTDevice();
 
-    bool initDevice() override;
+    bool initDriver() override;
 
 private:
     void doingEnrollStart(const QString &extraInfo) override;
@@ -42,15 +40,17 @@ private:
     void identifyKeyFeature(QByteArray keyFeature);
     
     void bindingUKey();
-    ECCPUBLICKEYBLOB genKeyPair();
+    ULONG genKeyPair(ECCPUBLICKEYBLOB *publicKey);
     bool isExistPublicKey();
     bool isExistsApplication(const QString &appName);
 
     void notifyUKeyEnrollProcess(EnrollProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
     void notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
 
+    QString getPinErrorReson(ULONG error);
+
+    void closeUkey();
 private:
-    Handle m_libHandle;
     DEVHANDLE m_devHandle;
     HAPPLICATION m_appHandle;
     HCONTAINER m_containerHandle;

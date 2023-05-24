@@ -11,21 +11,19 @@
  *
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
+#pragma once
+#include "context/context.h"
+#include "kiran-auth-device-i.h"
 
-#include "fp-builtin-context.h"
-#include "context/context-factory.h"
 namespace Kiran
 {
-REGISTER_CONTEXT(FPBuiltInContext);
-
-FPBuiltInContext::FPBuiltInContext(QObject* parent)
-    : Context{parent}
+class AuthDevice;
+class MultiFunctionContext : public Context
 {
-}
-
-AuthDevicePtr FPBuiltInContext::createDevice(const QString& idVendor, const QString& idProduct)
-{
-    return nullptr;
-}
-
+public:
+    explicit MultiFunctionContext(QObject *parent = nullptr);
+    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct) override {return nullptr;};
+    AuthDeviceList createDevices(const QString& idVendor, const QString& idProduct);
+    AuthDevicePtr createIriStarDevice(const QString& idVendor, const QString& idProduct,DeviceType deviceType);
+};
 }  // namespace Kiran

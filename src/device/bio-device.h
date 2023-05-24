@@ -29,11 +29,11 @@ protected:
     virtual QByteArray acquireFeature() = 0;
     virtual void acquireFeatureStop() = 0;
     virtual void acquireFeatureFail() = 0;
-
-    virtual void enrollTemplateMerge() = 0;
-    virtual int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) = 0;
     virtual QString identifyFeature(QByteArray feature, QStringList featureIDs) = 0;
-
+    
+    virtual void enrollTemplateMerge() {};
+    virtual int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) {return GENERAL_RESULT_OK;};
+    
     void internalStopEnroll() override;
     void internalStopIdentify() override;
 
