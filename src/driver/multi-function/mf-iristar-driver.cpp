@@ -12,6 +12,7 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 
+#include <functional>
 #include "mf-iristar-driver.h"
 #include <dlfcn.h>
 #include <qt5-log-i.h>
