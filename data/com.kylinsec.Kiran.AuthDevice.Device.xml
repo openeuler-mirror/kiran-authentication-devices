@@ -54,7 +54,7 @@
             <arg name="progress" type="i">
                 <description>A number between 0 and 100 to describe the progress of enrolling fingerprint. 0 is failed </description>
             </arg>
-            <arg name="result" type="i">
+            <arg name="status" type="i">
                 <description>Represent the status of the enrollment. Refer to enum DeviceType in file kiran-auth-device-i.h</description>
             </arg>
             <arg name="message" type="s">
@@ -66,7 +66,7 @@
             <arg name="feature_id" type="s">
                 <description>Feature ID.</description>
             </arg>
-            <arg name="result" type="i">
+            <arg name="status" type="i">
                 <description>Represent the status of the identification. Refer to enum DeviceType in file kiran-auth-device-i.h.</description>
             </arg>
             <arg name="message" type="s">

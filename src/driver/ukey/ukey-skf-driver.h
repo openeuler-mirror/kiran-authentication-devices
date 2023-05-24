@@ -12,50 +12,56 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 #pragma once
-#include "driver/driver.h"
-#include "ukey-skf.h"
 #include <QSharedPointer>
+#include "ukey-skf.h"
 
 namespace Kiran
 {
-struct DriverLib;
+struct SKFDriverLib;
 
-class UKeySKFDriver : public BDriver
+class UKeySKFDriver : public QObject
 {
+    Q_OBJECT
 public:
     UKeySKFDriver(QObject *parent = nullptr);
     ~UKeySKFDriver();
-    QString getName() override;
-    QString getFullName() override;
-    quint16 getDriverId() override;
 
+    bool isLoaded();
     bool loadLibrary(QString libPath);
+    
     DEVHANDLE connectDev();
+
     void deleteAllApplication(DEVHANDLE devHandle);
     QString enumApplication(DEVHANDLE devHandle);
 
     ULONG devAuth(DEVHANDLE devHandle);
-    HAPPLICATION onOpenApplication(DEVHANDLE hDev, LPSTR szAppName);
-    HCONTAINER onOpenContainer(HAPPLICATION appHandle,const QString &pin,QString containerName,ULONG *retryCount);
+    ULONG onOpenApplication(DEVHANDLE hDev, LPSTR szAppName, HAPPLICATION *appHandle);
+    ULONG onOpenContainer(HAPPLICATION appHandle, const QString &pin, QString containerName, ULONG *retryCount, HCONTAINER *containerHandle);
 
     void closeApplication(HAPPLICATION appHandle);
     void closeContainer(HCONTAINER containerHandle);
     void disConnectDev(DEVHANDLE devHandle);
 
-    HAPPLICATION createApplication(DEVHANDLE devHandle,QString pin,QString appName);
-    HCONTAINER createContainer(HAPPLICATION appHandle, QString pin,QString  containerName,ULONG *retryCount);
+    ULONG createApplication(DEVHANDLE devHandle, QString pin, QString appName, HAPPLICATION *appHandle);
+    ULONG createContainer(HAPPLICATION appHandle, QString pin, QString containerName, ULONG *retryCount, HCONTAINER *containerHandle);
 
-    ULONG genECCKeyPair(HCONTAINER containerHandle,ECCPUBLICKEYBLOB *pBlob);
+    ULONG genECCKeyPair(HCONTAINER containerHandle, ECCPUBLICKEYBLOB *pBlob);
 
-    ULONG authSignData(HCONTAINER containerHandle,DEVHANDLE devHandle,ECCSIGNATUREBLOB &Signature);
-    ULONG verifyData(DEVHANDLE devHandle,ECCSIGNATUREBLOB &Signature, ECCPUBLICKEYBLOB &publicKey);
+    ULONG authSignData(HCONTAINER containerHandle, DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature);
+    ULONG verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature, ECCPUBLICKEYBLOB &publicKey);
+
+    ULONG changePin(DEVHANDLE devHandle, int userType, const QString &currentPin, const QString &newPin, ULONG *retryCount);
+    
+
+    
+    ULONG unblockPin(DEVHANDLE devHandle, const QString &adminPin, const QString &newUserPin, ULONG *retryCount);
 
     QString getErrorReason(ULONG error);
 
     QString getDefaultValueFromConf(const QString &key);
 
 private:
-    QSharedPointer<DriverLib> m_driverLib;
+    QSharedPointer<SKFDriverLib> m_driverLib;
     HANDLE m_libHandle;
 };
 

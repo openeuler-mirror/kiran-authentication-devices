@@ -15,9 +15,9 @@
 #include "context-factory.h"
 #include <qt5-log-i.h>
 #include <QMutex>
+#include "context/multi-function-context.h"
 #include "kiran-auth-device-i.h"
 #include "third-party-device.h"
-
 namespace Kiran
 {
 
@@ -54,7 +54,7 @@ ContextFactory::ContextFactory(QObject* parent)
 {
 }
 
-AuthDevicePtr ContextFactory::createDevice(const QString& idVendor, const QString& idProduct)
+AuthDeviceList ContextFactory::createDevices(const QString& idVendor, const QString& idProduct)
 {
     if (m_contexts.count() == 0)
     {
@@ -62,7 +62,17 @@ AuthDevicePtr ContextFactory::createDevice(const QString& idVendor, const QStrin
     }
 
     // TODO:先从内置默认支持的设备开始搜索，最后才搜索第三方设备
-    AuthDevicePtr device = nullptr;
+    AuthDeviceList deviceList;
+
+    // FIXME:先特殊处理iristarDevice，人脸和虹膜识别合一的设备
+    if ((idVendor == IRISTAR_ID_VENDOR) && (idProduct == IRISTAR_ID_PRODUCT))
+    {
+        QScopedPointer<MultiFunctionContext> mfContext(new MultiFunctionContext);
+        deviceList = mfContext->createDevices(idVendor, idProduct);
+        return deviceList;
+    }
+
+    AuthDevicePtr device;
     if (isDeviceSupported(idVendor, idProduct))
     {
         Q_FOREACH (auto context, m_contexts)
@@ -70,11 +80,12 @@ AuthDevicePtr ContextFactory::createDevice(const QString& idVendor, const QStrin
             device = context->createDevice(idVendor, idProduct);
             if (device != nullptr)
             {
-                return device;
+                deviceList << device;
+                return deviceList;
             }
         }
     }
-    return nullptr;
+    return deviceList;
 }
 
 bool ContextFactory::isDeviceSupported(const QString& idVendor, const QString& idProduct)

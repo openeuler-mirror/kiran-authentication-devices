@@ -35,7 +35,7 @@ AuthDevice::~AuthDevice(){};
 
 bool AuthDevice::init()
 {
-    if (!initDevice())
+    if (!initDriver())
     {
         return false;
     }
@@ -133,7 +133,7 @@ void AuthDevice::onEnrollStart(const QDBusMessage& dbusMessage, const QString& e
     if (deviceStatus() != DEVICE_STATUS_IDLE)
     {
         message = tr("Device Busy");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         KLOG_DEBUG() << message;
         return;
     }
@@ -158,7 +158,7 @@ void AuthDevice::onIdentifyStart(const QDBusMessage& dbusMessage, const QString&
     if (deviceStatus() != DEVICE_STATUS_IDLE)
     {
         message = tr("Device Busy");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_RESULT_NOT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_NOT_MATCH, message);
         KLOG_DEBUG() << QString("%1, deviceID:%2").arg(message).arg(deviceID());
         return;
     }
@@ -194,7 +194,7 @@ CHECK_AUTH(AuthDevice, IdentifyStop, onIdentifyStop, AUTH_USER_ADMIN)
 
 QStringList AuthDevice::GetFeatureIDList()
 {
-    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct);
+    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct,deviceType());
     return featureIDs;
 }
 

@@ -27,21 +27,21 @@
 namespace Kiran
 {
 
-#define SD_FV_TEMPLATE_NUM 6         // 注册登记模板时，需要采集的指静脉次数
-#define SD_ENROLL_TIME_OUT 300       /* 入录指静脉等待时间，单位秒*/
-#define SD_TEMPLATE_MAX_NUMBER 10000 /* 最大指纹模板数目 */
+#define SD_FV_TEMPLATE_NUM 6                                   // 注册登记模板时，需要采集的指静脉次数
+#define SD_ENROLL_TIME_OUT 300                                 /* 入录指静脉等待时间，单位秒*/
+#define SD_TEMPLATE_MAX_NUMBER 10000                           /* 最大指纹模板数目 */
 
 #define IMAGE_TIME_OUT 50                                      // 获取图像等待的时间,单位秒（即：超过这个时间没有检测到touch就返回）,经过简单测试该设备最大等待时间为50s
 #define IMAGE_ROI_WIDTH 500                                    // 图像宽度
 #define IMAGE_ROI_HEIGHT 200                                   // 图像高度
 #define IMAGE_SIZE (IMAGE_ROI_WIDTH * IMAGE_ROI_HEIGHT + 208)  // 图片大小
 
-#define FEATURE_SIZE 1024   // 指静脉特征值大小
-#define TEMPLATE_SIZE 6144  // 指静脉模板大小
+#define FEATURE_SIZE 1024                                      // 指静脉特征值大小
+#define TEMPLATE_SIZE 6144                                     // 指静脉模板大小
 
-#define TEMPLATE_FV_NUM 6  // 注册登记模板时，需要采集的指静脉次数
+#define TEMPLATE_FV_NUM 6                                      // 注册登记模板时，需要采集的指静脉次数
 
-#define SD_FV_DRIVER_LIB "sdfv"  // 该名称不是实际so名称，由于实际驱动由多个so组成，为了表示方便自定义了一个名称进行标识
+#define SD_FV_DRIVER_LIB "sdfv"                                // 该名称不是实际so名称，由于实际驱动由多个so组成，为了表示方便自定义了一个名称进行标识
 #define SD_FV_DRIVER_LIB_PROCESS "libTGFVProcessAPI.so"
 #define SD_FV_DRIVER_LIB_COM "libTGVM661JComAPI.so"
 #define SD_LICENSE_PATH "/usr/share/kiran-authentication-devices-sdk/sd/license.dat"
@@ -90,9 +90,8 @@ extern "C"
     typedef int (*TGSetDevLedFunc)(int ledBlue, int ledGreen, int ledRed);
 }
 
-struct DriverLib
-{
-    // libTGFVProcessAPI.so
+struct FVSDDriverLib
+{  // libTGFVProcessAPI.so
     TGInitFVProcessFunc TGInitFVProcess;
     TGImgExtractFeatureVerifyFunc TGImgExtractFeatureVerify;
     TGFeaturesFusionTmplFunc TGFeaturesFusionTmpl;
@@ -109,6 +108,28 @@ struct DriverLib
     TGGetDevImageFunc TGGetDevImage;
     TGCancelGetImageFunc TGCancelGetImage;
     TGSetDevLedFunc TGSetDevLed;
+
+    void loadSym(Handle libProcessHandle, Handle libComHandle)
+    {
+        this->TGInitFVProcess = (TGInitFVProcessFunc)dlsym(libProcessHandle, "TGInitFVProcess");
+        this->TGImgExtractFeatureVerify = (TGImgExtractFeatureVerifyFunc)dlsym(libProcessHandle, "TGImgExtractFeatureVerify");
+        this->TGFeaturesFusionTmpl = (TGFeaturesFusionTmplFunc)dlsym(libProcessHandle, "TGFeaturesFusionTmpl");
+        this->TGFeatureMatchTmpl1N = (TGFeatureMatchTmpl1NFunc)dlsym(libProcessHandle, "TGFeatureMatchTmpl1N");
+        this->TGImgExtractFeatureRegister = (TGImgExtractFeatureRegisterFunc)dlsym(libProcessHandle, "TGImgExtractFeatureRegister");
+
+        this->TGOpenDev = (TGOpenDevFunc)dlsym(libComHandle, "TGOpenDev");
+        this->TGGetDevStatus = (TGGetDevStatusFunc)dlsym(libComHandle, "TGGetDevStatus");
+        this->TGCloseDev = (TGCloseDevFunc)dlsym(libComHandle, "TGCloseDev");
+        this->TGGetDevFW = (TGGetDevFWFunc)dlsym(libComHandle, "TGGetDevFW");
+        this->TGGetDevSN = (TGGetDevSNFunc)dlsym(libComHandle, "TGGetDevSN");
+        this->TGPlayDevVoice = (TGPlayDevVoiceFunc)dlsym(libComHandle, "TGPlayDevVoice");
+        this->TGGetDevImage = (TGGetDevImageFunc)dlsym(libComHandle, "TGGetDevImage");
+        this->TGCancelGetImage = (TGCancelGetImageFunc)dlsym(libComHandle, "TGCancelGetImage");
+        this->TGSetDevLed = (TGSetDevLedFunc)dlsym(libComHandle, "TGSetDevLed");
+
+        this->isLoaded = true;
+    };
+    bool isLoaded = false;
 };
 
 FVSDDevice::FVSDDevice(QObject *parent) : BioDevice{parent},
@@ -119,14 +140,14 @@ FVSDDevice::FVSDDevice(QObject *parent) : BioDevice{parent},
     setDeviceType(DEVICE_TYPE_FingerVein);
     setDeviceDriver(SD_FV_DRIVER_LIB);
     setMergeTemplateCount(TEMPLATE_FV_NUM);
+    m_driverLib = QSharedPointer<FVSDDriverLib>(new FVSDDriverLib);
 }
 
 FVSDDevice::~FVSDDevice()
 {
-    if (!deviceID().isEmpty())
+    if (m_driverLib->isLoaded)
     {
         acquireFeatureStop();
-        KLOG_DEBUG() << "TGGetDevStatus():" << m_driverLib->TGGetDevStatus();
         m_driverLib->TGCloseDev();
     }
 
@@ -160,27 +181,12 @@ bool FVSDDevice::loadLib()
         return false;
     }
 
-    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
-    m_driverLib->TGInitFVProcess = (TGInitFVProcessFunc)dlsym(m_libProcessHandle, "TGInitFVProcess");
-    m_driverLib->TGImgExtractFeatureVerify = (TGImgExtractFeatureVerifyFunc)dlsym(m_libProcessHandle, "TGImgExtractFeatureVerify");
-    m_driverLib->TGFeaturesFusionTmpl = (TGFeaturesFusionTmplFunc)dlsym(m_libProcessHandle, "TGFeaturesFusionTmpl");
-    m_driverLib->TGFeatureMatchTmpl1N = (TGFeatureMatchTmpl1NFunc)dlsym(m_libProcessHandle, "TGFeatureMatchTmpl1N");
-    m_driverLib->TGImgExtractFeatureRegister = (TGImgExtractFeatureRegisterFunc)dlsym(m_libProcessHandle, "TGImgExtractFeatureRegister");
-
-    m_driverLib->TGOpenDev = (TGOpenDevFunc)dlsym(m_libComHandle, "TGOpenDev");
-    m_driverLib->TGGetDevStatus = (TGGetDevStatusFunc)dlsym(m_libComHandle, "TGGetDevStatus");
-    m_driverLib->TGCloseDev = (TGCloseDevFunc)dlsym(m_libComHandle, "TGCloseDev");
-    m_driverLib->TGGetDevFW = (TGGetDevFWFunc)dlsym(m_libComHandle, "TGGetDevFW");
-    m_driverLib->TGGetDevSN = (TGGetDevSNFunc)dlsym(m_libComHandle, "TGGetDevSN");
-    m_driverLib->TGPlayDevVoice = (TGPlayDevVoiceFunc)dlsym(m_libComHandle, "TGPlayDevVoice");
-    m_driverLib->TGGetDevImage = (TGGetDevImageFunc)dlsym(m_libComHandle, "TGGetDevImage");
-    m_driverLib->TGCancelGetImage = (TGCancelGetImageFunc)dlsym(m_libComHandle, "TGCancelGetImage");
-    m_driverLib->TGSetDevLed = (TGSetDevLedFunc)dlsym(m_libComHandle, "TGSetDevLed");
+    m_driverLib->loadSym(m_libProcessHandle, m_libComHandle);
 
     return true;
 }
 
-bool FVSDDevice::initDevice()
+bool FVSDDevice::initDriver()
 {
     if (!loadLib())
     {
@@ -233,10 +239,12 @@ QByteArray FVSDDevice::acquireFeature()
     {
         int voice = (0 == m_enrollTemplates.count()) ? VOICE_PLS_PUT_SOFTLY : VOICE_PLS_REPUT;
         m_driverLib->TGPlayDevVoice(voice);
-        KLOG_DEBUG() << "Please put your finger in";
     }
     else
+    {
         m_driverLib->TGPlayDevVoice(VOICE_PLS_PUT_SOFTLY);
+    }
+
     // 采集指静脉图像
     int ret = m_driverLib->TGGetDevImage(img, IMAGE_TIME_OUT);
     KLOG_DEBUG() << "Collecting digital vein images:" << ret;
@@ -285,7 +293,7 @@ QByteArray FVSDDevice::acquireFeature()
 void FVSDDevice::acquireFeatureStop()
 {
     m_driverLib->TGCancelGetImage();
-    if (m_futureWatcher.data() != nullptr)
+    if (!m_futureWatcher.isNull())
     {
         m_futureWatcher->waitForFinished();
     }
@@ -352,7 +360,7 @@ void FVSDDevice::enrollTemplateMerge()
         QString id = QCryptographicHash::hash(mergedTemplate, QCryptographicHash::Md5).toHex();
 
         DeviceInfo deviceInfo = this->deviceInfo();
-        bool save = FeatureDB::getInstance()->addFeature(id, mergedTemplate, deviceInfo);
+        bool save = FeatureDB::getInstance()->addFeature(id, mergedTemplate, deviceInfo, deviceType());
         if (save)
         {
             notifyEnrollProcess(ENROLL_PROCESS_SUCCESS, id);
@@ -391,7 +399,7 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
     DeviceInfo deviceInfo = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct);
+        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
     }
     else
     {
@@ -403,43 +411,45 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
         }
     }
 
-    if (saveList.count() != 0)
+    if (saveList.count() == 0)
     {
-        QByteArray saveTempl;
-        Q_FOREACH (auto saveFeature, saveList)
-        {
-            saveTempl.append(saveFeature);
-        }
+        return QString();
+    }
 
-        int matchIndex = 0;
-        int matchScore = 0;
-        unsigned char updateTmpl[TEMPLATE_SIZE] = {0};  // 自我学习后的新模板
-        KLOG_DEBUG() << "saveList.count():" << saveList.count();
+    QByteArray saveTempl;
+    Q_FOREACH (auto saveFeature, saveList)
+    {
+        saveTempl.append(saveFeature);
+    }
 
-        int matchResult = m_driverLib->TGFeatureMatchTmpl1N((unsigned char *)feature.data(),
-                                                            (unsigned char *)saveTempl.data(),
-                                                            saveList.count(),
-                                                            &matchIndex,
-                                                            &matchScore,
-                                                            updateTmpl);
+    int matchIndex = 0;
+    int matchScore = 0;
+    unsigned char updateTmpl[TEMPLATE_SIZE] = {0};  // 自我学习后的新模板
+    KLOG_DEBUG() << "saveList.count():" << saveList.count();
 
-        // 存在更新的模板
-        // 在数据库中替换掉原来的模板，保持FeatureID不变
-        if (matchResult == GENERAL_RESULT_OK)
-        {
-            QByteArray matchedFeature = saveTempl.mid((matchIndex - 1) * TEMPLATE_SIZE, TEMPLATE_SIZE);
-            featureID = FeatureDB::getInstance()->getFeatureID(matchedFeature);
+    int matchResult = m_driverLib->TGFeatureMatchTmpl1N((unsigned char *)feature.data(),
+                                                        (unsigned char *)saveTempl.data(),
+                                                        saveList.count(),
+                                                        &matchIndex,
+                                                        &matchScore,
+                                                        updateTmpl);
 
-            QByteArray updateFeature((char *)updateTmpl, TEMPLATE_SIZE);
-            bool result = FeatureDB::getInstance()->updateFeature(featureID, updateFeature);
-            if (!result)
-                KLOG_DEBUG() << "update feature failed!";
-            KLOG_DEBUG() << "identifyFeature match success";
-        }
-        else
-        {
-            KLOG_DEBUG() << "matchResult:" << matchResult;
-        }
+    // 存在更新的模板
+    // 在数据库中替换掉原来的模板，保持FeatureID不变
+    if (matchResult == GENERAL_RESULT_OK)
+    {
+        QByteArray matchedFeature = saveTempl.mid((matchIndex - 1) * TEMPLATE_SIZE, TEMPLATE_SIZE);
+        featureID = FeatureDB::getInstance()->getFeatureID(matchedFeature);
+
+        QByteArray updateFeature((char *)updateTmpl, TEMPLATE_SIZE);
+        bool result = FeatureDB::getInstance()->updateFeature(featureID, updateFeature);
+        if (!result)
+            KLOG_DEBUG() << "update feature failed!";
+        KLOG_DEBUG() << "identifyFeature match success";
+    }
+    else
+    {
+        KLOG_DEBUG() << "matchResult:" << matchResult;
     }
 
     return featureID;
@@ -487,31 +497,31 @@ void FVSDDevice::notifyEnrollProcess(EnrollProcess process, const QString &featu
     {
     case ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("Finger vein image not obtained");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_RETRY, message);
         break;
     case ENROLL_PROCESS_PASS:
-        message = tr("Partial finger vein feature entry");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_RESULT_PASS, message);
+        message = tr("Partial finger vein feature entry,please continue to place your finger");
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_STATUS_PASS, message);
         break;
     case ENROLL_PROCESS_REPEATED_ENROLL:
         message = tr("The finger vein has been enrolled");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE:
         message = tr("Please place the same finger!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 15, ENROLL_STATUS_RETRY, message);
         break;
     case ENROLL_PROCESS_MEGER_FAIL:
         message = tr("Finger vein template merged failed");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_SUCCESS:
         message = tr("Successed save feature");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_RESULT_COMPLETE, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_STATUS_COMPLETE, message);
         break;
     case ENROLL_PROCESS_SAVE_FAIL:
         message = tr("Save Feature Failed!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE_AFTER_MERGED:
         break;
@@ -538,17 +548,17 @@ void FVSDDevice::notifyIdentifyProcess(IdentifyProcess process, const QString &f
     {
     case IDENTIFY_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("timeout, acquire finger vein fail!");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_RETRY, message);
         break;
     case IDENTIFY_PROCESS_MACTCH:
         message = tr("Feature Match");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_MATCH, message);
         m_driverLib->TGSetDevLed(1, 0, 1);                 // 绿灯亮
         m_driverLib->TGPlayDevVoice(VOICE_IDENT_SUCCESS);  // 语音:认证成功
         break;
     case IDENTIFY_PROCESS_NO_MATCH:
         message = tr("Feature not match, place again");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_NOT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_NOT_MATCH, message);
         m_driverLib->TGSetDevLed(1, 1, 0);
         m_driverLib->TGPlayDevVoice(VOICE_IDENT_FAIL);
         break;

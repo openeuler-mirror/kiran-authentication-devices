@@ -99,7 +99,7 @@ extern "C"
     typedef void (*T_ZKFPM_ConfigLog)(int nLevel, int nType, char* fileName);
 };
 
-struct DriverLib
+struct FPZKDriverLib
 {
     T_ZKFPM_Init ZKFPM_Init;
     T_ZKFPM_Terminate ZKFPM_Terminate;
@@ -124,10 +124,36 @@ struct DriverLib
 
     T_ZKFPM_SetLogLevel ZKFPM_SetLogLevel;
     T_ZKFPM_ConfigLog ZKFPM_ConfigLog;
+
+    void loadSym(Handle libHandle)
+    {
+        this->ZKFPM_Init = (T_ZKFPM_Init)dlsym(libHandle, "ZKFPM_Init");
+        this->ZKFPM_Terminate = (T_ZKFPM_Terminate)dlsym(libHandle, "ZKFPM_Terminate");
+        this->ZKFPM_GetDeviceCount = (T_ZKFPM_GetDeviceCount)dlsym(libHandle, "ZKFPM_GetDeviceCount");
+        this->ZKFPM_OpenDevice = (T_ZKFPM_OpenDevice)dlsym(libHandle, "ZKFPM_OpenDevice");
+        this->ZKFPM_CloseDevice = (T_ZKFPM_CloseDevice)dlsym(libHandle, "ZKFPM_CloseDevice");
+        this->ZKFPM_SetParameters = (T_ZKFPM_SetParameters)dlsym(libHandle, "ZKFPM_SetParameters");
+        this->ZKFPM_GetParameters = (T_ZKFPM_GetParameters)dlsym(libHandle, "ZKFPM_GetParameters");
+        this->ZKFPM_AcquireFingerprint = (T_ZKFPM_AcquireFingerprint)dlsym(libHandle, "ZKFPM_AcquireFingerprint");
+        this->ZKFPM_DBInit = (T_ZKFPM_DBInit)dlsym(libHandle, "ZKFPM_DBInit");
+        this->ZKFPM_DBFree = (T_ZKFPM_DBFree)dlsym(libHandle, "ZKFPM_DBFree");
+        this->ZKFPM_DBMerge = (T_ZKFPM_DBMerge)dlsym(libHandle, "ZKFPM_DBMerge");
+        this->ZKFPM_DBDel = (T_ZKFPM_DBDel)dlsym(libHandle, "ZKFPM_DBDel");
+        this->ZKFPM_DBAdd = (T_ZKFPM_DBAdd)dlsym(libHandle, "ZKFPM_DBAdd");
+        this->ZKFPM_DBClear = (T_ZKFPM_DBClear)dlsym(libHandle, "ZKFPM_DBClear");
+        this->ZKFPM_DBCount = (T_ZKFPM_DBCount)dlsym(libHandle, "ZKFPM_DBCount");
+        this->ZKFPM_DBIdentify = (T_ZKFPM_DBIdentify)dlsym(libHandle, "ZKFPM_DBIdentify");
+        this->ZKFPM_DBMatch = (T_ZKFPM_DBMatch)dlsym(libHandle, "ZKFPM_DBMatch");
+        this->ZKFPM_SetLogLevel = (T_ZKFPM_SetLogLevel)dlsym(libHandle, "ZKFPM_SetLogLevel");
+        this->ZKFPM_ConfigLog = (T_ZKFPM_ConfigLog)dlsym(libHandle, "ZKFPM_ConfigLog");
+
+        this->isLoaded = true;
+    };
+    bool isLoaded = false;
 };
 
 FPZKDevice::FPZKDevice(QObject* parent)
-    : FPDevice{parent},
+    : BioDevice{parent},
       m_hDBCache(nullptr),
       m_libHandle(nullptr),
       m_driverLib(nullptr)
@@ -135,20 +161,21 @@ FPZKDevice::FPZKDevice(QObject* parent)
     setDeviceType(DEVICE_TYPE_FingerPrint);
     setDeviceDriver(FP_ZK_DRIVER_LIB);
     setMergeTemplateCount(FP_ZK_MEGER_TEMPLATE_COUNT);
+    m_driverLib = QSharedPointer<FPZKDriverLib>(new FPZKDriverLib);
 }
 
 // 析构时对设备进行资源回收
 FPZKDevice::~FPZKDevice()
 {
     acquireFeatureStop();
-    if (m_hDBCache)
-    {
-        m_driverLib->ZKFPM_DBFree(m_hDBCache);
-        m_hDBCache = NULL;
-    }
 
-    if (m_driverLib.data())
+    if (m_driverLib->isLoaded)
     {
+        if (m_hDBCache)
+        {
+            m_driverLib->ZKFPM_DBFree(m_hDBCache);
+            m_hDBCache = NULL;
+        }
         m_driverLib->ZKFPM_Terminate();  // 释放资源
     }
 
@@ -159,7 +186,7 @@ FPZKDevice::~FPZKDevice()
     }
 }
 
-bool FPZKDevice::initDevice()
+bool FPZKDevice::initDriver()
 {
     if (!loadLib())
     {
@@ -191,31 +218,7 @@ bool FPZKDevice::loadLib()
         return false;
     }
 
-    m_driverLib = QSharedPointer<DriverLib>(new DriverLib);
-    m_driverLib->ZKFPM_Init = (T_ZKFPM_Init)dlsym(m_libHandle, "ZKFPM_Init");
-    if (NULL == m_driverLib->ZKFPM_Init)
-    {
-        return false;
-    }
-
-    m_driverLib->ZKFPM_Terminate = (T_ZKFPM_Terminate)dlsym(m_libHandle, "ZKFPM_Terminate");
-    m_driverLib->ZKFPM_GetDeviceCount = (T_ZKFPM_GetDeviceCount)dlsym(m_libHandle, "ZKFPM_GetDeviceCount");
-    m_driverLib->ZKFPM_OpenDevice = (T_ZKFPM_OpenDevice)dlsym(m_libHandle, "ZKFPM_OpenDevice");
-    m_driverLib->ZKFPM_CloseDevice = (T_ZKFPM_CloseDevice)dlsym(m_libHandle, "ZKFPM_CloseDevice");
-    m_driverLib->ZKFPM_SetParameters = (T_ZKFPM_SetParameters)dlsym(m_libHandle, "ZKFPM_SetParameters");
-    m_driverLib->ZKFPM_GetParameters = (T_ZKFPM_GetParameters)dlsym(m_libHandle, "ZKFPM_GetParameters");
-    m_driverLib->ZKFPM_AcquireFingerprint = (T_ZKFPM_AcquireFingerprint)dlsym(m_libHandle, "ZKFPM_AcquireFingerprint");
-    m_driverLib->ZKFPM_DBInit = (T_ZKFPM_DBInit)dlsym(m_libHandle, "ZKFPM_DBInit");
-    m_driverLib->ZKFPM_DBFree = (T_ZKFPM_DBFree)dlsym(m_libHandle, "ZKFPM_DBFree");
-    m_driverLib->ZKFPM_DBMerge = (T_ZKFPM_DBMerge)dlsym(m_libHandle, "ZKFPM_DBMerge");
-    m_driverLib->ZKFPM_DBDel = (T_ZKFPM_DBDel)dlsym(m_libHandle, "ZKFPM_DBDel");
-    m_driverLib->ZKFPM_DBAdd = (T_ZKFPM_DBAdd)dlsym(m_libHandle, "ZKFPM_DBAdd");
-    m_driverLib->ZKFPM_DBClear = (T_ZKFPM_DBClear)dlsym(m_libHandle, "ZKFPM_DBClear");
-    m_driverLib->ZKFPM_DBCount = (T_ZKFPM_DBCount)dlsym(m_libHandle, "ZKFPM_DBCount");
-    m_driverLib->ZKFPM_DBIdentify = (T_ZKFPM_DBIdentify)dlsym(m_libHandle, "ZKFPM_DBIdentify");
-    m_driverLib->ZKFPM_DBMatch = (T_ZKFPM_DBMatch)dlsym(m_libHandle, "ZKFPM_DBMatch");
-    m_driverLib->ZKFPM_SetLogLevel = (T_ZKFPM_SetLogLevel)dlsym(m_libHandle, "ZKFPM_SetLogLevel");
-    m_driverLib->ZKFPM_ConfigLog = (T_ZKFPM_ConfigLog)dlsym(m_libHandle, "ZKFPM_ConfigLog");
+    m_driverLib->loadSym(m_libHandle);
 
     return true;
 }
@@ -244,6 +247,7 @@ Handle FPZKDevice::openDevice()
 
 QByteArray FPZKDevice::acquireFeature()
 {
+    KLOG_DEBUG() << "start acquire feature";
     Handle hDevice = openDevice();
     if (!hDevice)
     {
@@ -260,20 +264,19 @@ QByteArray FPZKDevice::acquireFeature()
     unsigned int tempLen = FP_ZK_MAX_TEMPLATE_SIZE;
     unsigned int curTime;
     int ret;
-    m_doAcquire = true;
 
     memset(paramValue, 0x0, 4);  // 初始化paramValue[4]
     cbParamValue = 4;            // 初始化cbParamValue
     /* |   设备  |   参数类型     |  参数值     |  参数数据长度  */
     m_driverLib->ZKFPM_GetParameters(hDevice, 1, (unsigned char*)paramValue, &cbParamValue);  // 获取采集器参数 图像宽
 
-    memset(paramValue, 0x0, 4);  // 初始化paramValue[4]
-    cbParamValue = 4;            // 初始化cbParamValue
+    memset(paramValue, 0x0, 4);                                                               // 初始化paramValue[4]
+    cbParamValue = 4;                                                                         // 初始化cbParamValue
     /* |   设备  |   参数类型     |  参数值     |  参数数据长度  */
     m_driverLib->ZKFPM_GetParameters(hDevice, 2, (unsigned char*)paramValue, &cbParamValue);  // 获取采集器参数 图像高
 
-    memset(paramValue, 0x0, 4);  // 初始化paramValue[4]
-    cbParamValue = 4;            // 初始化cbParamValue
+    memset(paramValue, 0x0, 4);                                                               // 初始化paramValue[4]
+    cbParamValue = 4;                                                                         // 初始化cbParamValue
     /* |   设备  |   参数类型     |  参数值     |  参数数据长度  */
     m_driverLib->ZKFPM_GetParameters(hDevice, 106, (unsigned char*)paramValue, &cbParamValue);  // 获取采集器参数 图像数据大小
 
@@ -294,6 +297,7 @@ QByteArray FPZKDevice::acquireFeature()
                                                     szTemplate, &tempLen);
         if (ret == GENERAL_RESULT_OK)
         {
+            KLOG_DEBUG() << "acquire fingerprint success";
             break;
         }
         else if (ret == ZKFP_ERR_EXTRACT_FP ||
@@ -322,7 +326,7 @@ QByteArray FPZKDevice::acquireFeature()
 void FPZKDevice::acquireFeatureStop()
 {
     m_doAcquire = false;
-    if (m_futureWatcher.data() != nullptr)
+    if (!m_futureWatcher.isNull())
     {
         m_futureWatcher->waitForFinished();
     }
@@ -373,15 +377,14 @@ int FPZKDevice::enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplat
     return score > 0 ? GENERAL_RESULT_OK : GENERAL_RESULT_FAIL;
 }
 
-
 QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureIDs)
 {
     QList<QByteArray> saveList;
     QString featureID;
-    DeviceInfo info  = this->deviceInfo();
+    DeviceInfo info = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct);
+        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct,deviceType());
     }
     else
     {
@@ -393,27 +396,30 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
         }
     }
 
-    if (saveList.count() != 0)
+    if (saveList.count() == 0)
     {
-        for (int j = 0; j < saveList.count(); j++)
+        return QString();
+    }
+
+    for (int j = 0; j < saveList.count(); j++)
+    {
+        auto saveTemplate = saveList.value(j);
+        int ret = enrollTemplateMatch(fpTemplate, saveTemplate);
+        // 指纹已经存在，直接返回该指纹
+        if (ret == GENERAL_RESULT_OK)
         {
-            auto saveTemplate = saveList.value(j);
-            int ret = enrollTemplateMatch(fpTemplate, saveTemplate);
-            // 指纹已经存在，直接返回该指纹
-            if (ret == GENERAL_RESULT_OK)
-            {
-                featureID = FeatureDB::getInstance()->getFeatureID(saveTemplate);
-                break;
-            }
+            featureID = FeatureDB::getInstance()->getFeatureID(saveTemplate);
+            break;
         }
     }
+
     return featureID;
 }
 
 bool FPZKDevice::saveFPrintTemplate(QByteArray fpTemplate, const QString& featureID)
 {
     DeviceInfo deviceInfo = this->deviceInfo();
-    bool save = FeatureDB::getInstance()->addFeature(featureID, fpTemplate, deviceInfo);
+    bool save = FeatureDB::getInstance()->addFeature(featureID, fpTemplate, deviceInfo,deviceType());
     return save;
 }
 
@@ -465,36 +471,36 @@ void FPZKDevice::notifyEnrollProcess(EnrollProcess process, const QString& featu
     {
     case ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("acquire fingerprint fail!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_PASS:
-        message = tr("Partial fingerprint feature entry");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_RESULT_PASS, message);
+        message = tr("Partial fingerprint feature entry,please continue to press your fingers");
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_STATUS_PASS, message);
         break;
     case ENROLL_PROCESS_REPEATED_ENROLL:
         message = tr("The fingerprint has been enrolled");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE:
         message = tr("Please place the same finger!");
         KLOG_DEBUG() << message;
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_RESULT_RETRY, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", enrollTemplatesFromCache().count() * 25, ENROLL_STATUS_RETRY, message);
         break;
     case ENROLL_PROCESS_MEGER_FAIL:
         message = tr("Failed to enroll fingerprint, please enroll again");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_SUCCESS:
         message = tr("Successed save finger");
-        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_RESULT_COMPLETE, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_STATUS_COMPLETE, message);
         break;
     case ENROLL_PROCESS_SAVE_FAIL:
         message = tr("Save Finger Failed!");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     case ENROLL_PROCESS_INCONSISTENT_FEATURE_AFTER_MERGED:
         message = tr("Failed to enroll fingerprint, please enroll again");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_RESULT_FAIL, message);
+        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         break;
     default:
         break;
@@ -521,15 +527,15 @@ void FPZKDevice::notifyIdentifyProcess(IdentifyProcess process, const QString& f
         break;
     case IDENTIFY_PROCESS_ACQUIRE_FEATURE_FAIL:
         message = tr("acquire fingerprint fail!");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_RESULT_NOT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_NOT_MATCH, message);
         break;
     case IDENTIFY_PROCESS_MACTCH:
         message = tr("Fingerprint match");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_MATCH, message);
         break;
     case IDENTIFY_PROCESS_NO_MATCH:
         message = tr("Fingerprint not match, place again");
-        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_RESULT_NOT_MATCH, message);
+        Q_EMIT m_dbusAdaptor->IdentifyStatus(featureID, IDENTIFY_STATUS_NOT_MATCH, message);
         break;
     default:
         break;

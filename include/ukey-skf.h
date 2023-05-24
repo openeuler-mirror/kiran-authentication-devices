@@ -15,6 +15,7 @@
 #pragma once
 #include <stdint.h>
 #include <QString>
+#include <QObject>
 
 #ifdef __cplusplus
 extern "C"

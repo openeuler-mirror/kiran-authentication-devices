@@ -30,7 +30,7 @@ private:
 public:
     static ContextFactory* getInstance();
 
-    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct);
+    AuthDeviceList createDevices(const QString& idVendor, const QString& idProduct);
 
     bool isDeviceSupported(const QString& idVendor, const QString& idProduct);
     void DestoryContext(Context* context);
