@@ -110,7 +110,7 @@ MFIriStarDriver *MFIriStarDriver::getInstance()
     return pInst.data();
 }
 
-MFIriStarDriver::MFIriStarDriver(QObject *parent) : BDriver{parent}
+MFIriStarDriver::MFIriStarDriver(QObject *parent) : QObject{parent}
 {
     m_driverLib = QSharedPointer<IriStarDriverLib>(new IriStarDriverLib);
     m_idVendor = IRISTAR_ID_VENDOR;

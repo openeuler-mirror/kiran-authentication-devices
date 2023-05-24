@@ -23,10 +23,6 @@
 
 namespace Kiran
 {
-#define FT_UKEY_DRIVER_LIB "libes_3000gm.so"
-#define UKEY_APP_NAME "KIRAN-AUTHENTICATION-DEVICES"
-#define UKEY_CONTAINER_NAME "1003-3001"
-
 UKeyFTDevice::UKeyFTDevice(QObject *parent) : AuthDevice{parent},
                                               m_appHandle(nullptr),
                                               m_devHandle(nullptr),
@@ -39,36 +35,11 @@ UKeyFTDevice::UKeyFTDevice(QObject *parent) : AuthDevice{parent},
 
 UKeyFTDevice::~UKeyFTDevice()
 {
-    if (m_driver->isLoaded())
-    {
-        if (m_containerHandle)
-        {
-            m_driver->closeContainer(m_containerHandle);
-            m_containerHandle = nullptr;
-        }
-
-        if (m_appHandle)
-        {
-            m_driver->closeApplication(m_appHandle);
-            m_appHandle = nullptr;
-        }
-
-        if (m_devHandle)
-        {
-            m_driver->disConnectDev(m_devHandle);
-            m_devHandle = nullptr;
-        }
-    }
 }
 
 bool UKeyFTDevice::initDriver()
 {
     if (!m_driver->loadLibrary(FT_UKEY_DRIVER_LIB))
-    {
-        return false;
-    }
-    m_devHandle = m_driver->connectDev();
-    if (!m_devHandle)
     {
         return false;
     }
@@ -88,6 +59,15 @@ void UKeyFTDevice::doingEnrollStart(const QString &extraInfo)
         QString message = tr("The pin code cannot be empty!");
         Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         KLOG_ERROR() << "The pin code cannot be empty!";
+        internalStopEnroll();
+        return;
+    }
+
+    m_devHandle = m_driver->connectDev();
+    if (!m_devHandle)
+    {
+        KLOG_ERROR() << "Connect Dev failed";
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL);
         internalStopEnroll();
         return;
     }
@@ -131,7 +111,7 @@ void UKeyFTDevice::bindingUKey()
     if (ret != SAR_OK)
     {
         KLOG_ERROR() << "gen ecc key pair failed:" << m_driver->getErrorReason(ret);
-        notifyUKeyEnrollProcess(ENROLL_PROCESS_SAVE_FAIL, ret);
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL, ret);
         return;
     }
     KLOG_DEBUG() << "gen ecc key pair success";
@@ -158,7 +138,7 @@ void UKeyFTDevice::bindingUKey()
     else
     {
         KLOG_DEBUG() << "save feature fail";
-        notifyUKeyEnrollProcess(ENROLL_PROCESS_SAVE_FAIL);
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL);
     }
 }
 
@@ -291,8 +271,7 @@ void UKeyFTDevice::internalStopEnroll()
 {
     if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
     {
-        m_driver->closeContainer(m_containerHandle);
-        m_driver->closeApplication(m_appHandle);
+        closeUkey();
         m_pin.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
@@ -304,8 +283,7 @@ void UKeyFTDevice::internalStopIdentify()
 {
     if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
     {
-        m_driver->closeContainer(m_containerHandle);
-        m_driver->closeApplication(m_appHandle);
+        closeUkey();
         m_identifyIDs.clear();
         m_pin.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
@@ -314,8 +292,40 @@ void UKeyFTDevice::internalStopIdentify()
     }
 }
 
+void UKeyFTDevice::closeUkey()
+{
+    if (!m_driver->isLoaded())
+    {
+        return;
+    }
+    if (m_containerHandle)
+    {
+        m_driver->closeContainer(m_containerHandle);
+        m_containerHandle = nullptr;
+    }
+
+    if (m_appHandle)
+    {
+        m_driver->closeApplication(m_appHandle);
+        m_appHandle = nullptr;
+    }
+
+    if (m_devHandle)
+    {
+        m_driver->disConnectDev(m_devHandle);
+        m_devHandle = nullptr;
+    }
+}
+
 void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
 {
+    DEVHANDLE m_devHandle = m_driver->connectDev();
+    if (!m_devHandle)
+    {
+        notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_NO_MATCH);
+        return;
+    }
+
     ULONG ret;
     ret = m_driver->onOpenApplication(m_devHandle, (LPSTR)UKEY_APP_NAME, &m_appHandle);
     if (ret != SAR_OK)
@@ -364,11 +374,8 @@ void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
 void UKeyFTDevice::notifyUKeyEnrollProcess(EnrollProcess process, ULONG error, const QString &featureID)
 {
     QString message, reason;
-    if (error != SAR_OK)
-    {
-        reason = m_driver->getErrorReason(error);
-    }
     // 目前只需要返回有关pin码的错误信息
+    reason = getPinErrorReson(error);
 
     switch (process)
     {
@@ -376,13 +383,14 @@ void UKeyFTDevice::notifyUKeyEnrollProcess(EnrollProcess process, ULONG error, c
         message = tr("Successed binding user");
         Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_STATUS_COMPLETE, message);
         break;
-    case ENROLL_PROCESS_SAVE_FAIL:
+    case ENROLL_PROCESS_FAIL:
         message = tr("Binding user failed!");
-        if (reason.contains("pin"))
+        if (!reason.isEmpty())
         {
             message.append(reason);
         }
         Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
+        KLOG_DEBUG() << "Ukey Error Reason:" << m_driver->getErrorReason(error);
         break;
     case ENROLL_PROCESS_REPEATED_ENROLL:
         message = tr("UKey has been bound");
@@ -407,19 +415,14 @@ void UKeyFTDevice::notifyUKeyEnrollProcess(EnrollProcess process, ULONG error, c
 void UKeyFTDevice::notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG error, const QString &featureID)
 {
     QString message, reason;
-    if (error != SAR_OK)
-    {
-        reason = m_driver->getErrorReason(error);
-        KLOG_DEBUG() << "fail reason:" << reason;
-    }
+    reason = getPinErrorReson(error);
 
-    KLOG_DEBUG() << "m_retryCount:" << m_retryCount;
     switch (process)
     {
     case IDENTIFY_PROCESS_NO_MATCH:
         message = tr("identify fail!");
         // 目前只需要返回有关pin码的错误信息
-        if (reason.contains("pin"))
+        if (!reason.isEmpty())
         {
             message.append(reason);
         }
@@ -438,6 +441,34 @@ void UKeyFTDevice::notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG erro
     {
         KLOG_DEBUG() << QString("%1, feature id:%2").arg(message).arg(featureID);
     }
+}
+
+QString UKeyFTDevice::getPinErrorReson(ULONG error)
+{
+    QString reason;
+    if (error == SAR_OK)
+    {
+        return reason;
+    }
+    // 目前只需要返回有关pin码的错误信息
+    switch (error)
+    {
+    case SAR_PIN_INCORRECT:
+        reason = tr("pin incorrect");
+        break;
+    case SAR_PIN_LOCKED:
+        reason = tr("pin locked");
+        break;
+    case SAR_PIN_INVALID:
+        reason = tr("invalid pin");
+        break;
+    case SAR_PIN_LEN_RANGE:
+        reason = tr("invalid pin length");
+        break;
+    default:
+        break;
+    }
+    return reason;
 }
 
 }  // namespace Kiran

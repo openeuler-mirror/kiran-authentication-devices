@@ -194,61 +194,58 @@
 <context>
     <name>Kiran::UKeyFTDevice</name>
     <message>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="88"/>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="251"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="84"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="247"/>
         <source>The pin code cannot be empty!</source>
         <translation>pin码不能为空!</translation>
     </message>
     <message>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="376"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="369"/>
         <source>Successed binding user</source>
         <translation>绑定用户成功</translation>
     </message>
     <message>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="380"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="373"/>
         <source>Binding user failed!</source>
         <translation>绑定用户失败！</translation>
     </message>
     <message>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="388"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="382"/>
         <source>UKey has been bound</source>
         <translation>UKey已经被绑定</translation>
     </message>
     <message>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="420"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="409"/>
         <source>identify fail!</source>
         <translation>认证失败!</translation>
     </message>
     <message>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="426"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="415"/>
         <source>,remaining retry count: %1</source>
         <translation>,剩余尝试次数: %1</translation>
     </message>
     <message>
-        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="430"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="419"/>
         <source>identify ukey success</source>
         <translation>ukey认证成功</translation>
     </message>
-</context>
-<context>
-    <name>QObject</name>
     <message>
-        <location filename="../include/ukey-skf.h" line="307"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="443"/>
         <source>pin incorrect</source>
         <translation>pin码不正确</translation>
     </message>
     <message>
-        <location filename="../include/ukey-skf.h" line="308"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="446"/>
         <source>pin locked</source>
         <translation>pin码被锁定</translation>
     </message>
     <message>
-        <location filename="../include/ukey-skf.h" line="309"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="449"/>
         <source>invalid pin</source>
         <translation>无效的pin码</translation>
     </message>
     <message>
-        <location filename="../include/ukey-skf.h" line="310"/>
+        <location filename="../src/device/ukey/ukey-ft-device.cpp" line="452"/>
         <source>invalid pin length</source>
         <translation>无效的pin码长度</translation>
     </message>

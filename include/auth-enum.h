@@ -25,6 +25,10 @@ namespace Kiran
 #define DRIVERS_CONF "/etc/kiran-authentication-devices/drivers.conf"
 #define AUTH_USER_ADMIN "com.kylinsec.kiran.authentication.user-administration"
 
+#define FT_UKEY_DRIVER_LIB "libes_3000gm.so"
+#define UKEY_APP_NAME "KIRAN-AUTHENTICATION-DEVICES"
+#define UKEY_CONTAINER_NAME "1003-3001"
+
 struct DeviceInfo
 {
     QString idVendor;
@@ -77,6 +81,8 @@ enum EnrollProcess
     ENROLL_PROCESS_MEGER_FAIL,
     // 录入成功
     ENROLL_PROCESS_SUCCESS,
+    // 录入失败
+    ENROLL_PROCESS_FAIL,
     // 特征保存失败
     ENROLL_PROCESS_SAVE_FAIL,
     // 合成后的指纹与先前录入的指纹不匹配

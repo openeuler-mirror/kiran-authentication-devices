@@ -47,6 +47,9 @@ private:
     void notifyUKeyEnrollProcess(EnrollProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
     void notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
 
+    QString getPinErrorReson(ULONG error);
+
+    void closeUkey();
 private:
     DEVHANDLE m_devHandle;
     HAPPLICATION m_appHandle;

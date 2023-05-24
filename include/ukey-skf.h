@@ -15,6 +15,7 @@
 #pragma once
 #include <stdint.h>
 #include <QString>
+#include <QObject>
 
 #ifdef __cplusplus
 extern "C"
@@ -304,10 +305,10 @@ static SKF_ERR_REASON skf_errors[] = {
 	{ SAR_KEYINFOTYPEERR,		"invalid key info type" },
 	{ SAR_NOT_EVENTERR,		"no event" },
 	{ SAR_DEVICE_REMOVED,		"device removed" },
-	{ SAR_PIN_INCORRECT,		QObject::tr("pin incorrect") },
-	{ SAR_PIN_LOCKED,		 QObject::tr("pin locked") },
-	{ SAR_PIN_INVALID,		QObject::tr("invalid pin") },
-	{ SAR_PIN_LEN_RANGE,		QObject::tr("invalid pin length") },
+	{ SAR_PIN_INCORRECT,		"pin incorrect" },
+	{ SAR_PIN_LOCKED,		 "pin locked" },
+	{ SAR_PIN_INVALID,		"invalid pin" },
+	{ SAR_PIN_LEN_RANGE,		"invalid pin length" },
 	{ SAR_USER_ALREADY_LOGGED_IN,	"user already logged in" },
 	{ SAR_USER_PIN_NOT_INITIALIZED,	"user pin not initialized" },
 	{ SAR_USER_TYPE_INVALID,	 "invalid user type" },

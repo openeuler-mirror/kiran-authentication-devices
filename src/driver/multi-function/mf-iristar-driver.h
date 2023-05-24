@@ -17,7 +17,6 @@
 #include <QSharedPointer>
 #include <string>
 #include "auth-enum.h"
-#include "driver/driver.h"
 #include "irsdk1.h"
 #include "irsdk2.h"
 #include "kiran-auth-device-i.h"
@@ -27,7 +26,7 @@ namespace Kiran
 struct IriStarDriverLib;
 typedef void *Handle;
 
-class MFIriStarDriver : public BDriver
+class MFIriStarDriver : public  QObject
 {
     Q_OBJECT
 private:
