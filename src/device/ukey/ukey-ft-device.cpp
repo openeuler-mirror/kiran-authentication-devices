@@ -23,28 +23,61 @@
 
 namespace Kiran
 {
-UKeyFTDevice::UKeyFTDevice(QObject *parent) : AuthDevice{parent},
-                                              m_appHandle(nullptr),
-                                              m_devHandle(nullptr),
-                                              m_containerHandle(nullptr)
+QStringList UKeyFTDevice::m_existingSerialNumber;
+
+UKeyFTDevice::UKeyFTDevice(QObject *parent) : AuthDevice{parent}
 {
     setDeviceType(DEVICE_TYPE_UKey);
     setDeviceDriver(FT_UKEY_DRIVER_LIB);
-    m_driver = QSharedPointer<UKeySKFDriver>(new UKeySKFDriver());
+    /**
+     * NOTE:
+     * UKey设备插入时，设备可能处在未准备好的状态，无法获取到serialNumber
+     * 如果初始化时，未获取到serialNumber，则开启定时器再次获取
+     */
+    if (!initSerialNumber())
+    {
+        m_reInitSerialNumberTimer.start(1000);
+    }
+    connect(&m_reInitSerialNumberTimer, &QTimer::timeout, this, &UKeyFTDevice::initSerialNumber);
 }
 
 UKeyFTDevice::~UKeyFTDevice()
 {
+    int index = m_existingSerialNumber.indexOf(deviceSerialNumber());
+    m_existingSerialNumber.removeAt(index);
+    KLOG_DEBUG() << "destory device, serialNumber:" << deviceSerialNumber();
 }
 
 bool UKeyFTDevice::initDriver()
 {
-    if (!m_driver->loadLibrary(FT_UKEY_DRIVER_LIB))
+    return true;
+}
+
+bool UKeyFTDevice::initSerialNumber()
+{
+    UKeySKFDriver driver;
+    driver.loadLibrary(FT_UKEY_DRIVER_LIB);
+    QStringList serialNumberList = driver.enumDevSerialNumber();
+    for (auto serialNumber : serialNumberList)
+    {
+        if (m_existingSerialNumber.contains(serialNumber))
+        {
+            continue;
+        }
+        setDeviceSerialNumber(serialNumber);
+        m_existingSerialNumber << serialNumber;
+        break;
+    }
+    KLOG_DEBUG() << "init serial number:" << deviceSerialNumber();
+    if (deviceSerialNumber().isEmpty())
     {
         return false;
     }
-
-    return true;
+    else
+    {
+        m_reInitSerialNumberTimer.stop();
+        return true;
+    }
 }
 
 void UKeyFTDevice::doingEnrollStart(const QString &extraInfo)
@@ -52,66 +85,71 @@ void UKeyFTDevice::doingEnrollStart(const QString &extraInfo)
     KLOG_DEBUG() << "ukey enroll start";
     QJsonValue ukeyValue = Utils::getValueFromJsonString(extraInfo, AUTH_DEVICE_JSON_KEY_UKEY);
     auto jsonObject = ukeyValue.toObject();
-    m_pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
-    bool rebinding = jsonObject.value(AUTH_DEVICE_JSON_KEY_REBINDING).toBool();
-    if (m_pin.isEmpty())
+    QString pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
+    HANDLE devHandle = nullptr;
+
+    KLOG_DEBUG() << "device serial number:" << deviceSerialNumber();
+    if (pin.isEmpty())
     {
         QString message = tr("The pin code cannot be empty!");
         Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
         KLOG_ERROR() << "The pin code cannot be empty!";
-        internalStopEnroll();
-        return;
+        goto end;
     }
 
-    m_devHandle = m_driver->connectDev();
-    if (!m_devHandle)
+    if (isExistBinding())
+    {
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_REPEATED_ENROLL);
+        goto end;
+    }
+
+    m_driver = new UKeySKFDriver();
+    if (!m_driver->loadLibrary(FT_UKEY_DRIVER_LIB))
+    {
+        KLOG_ERROR() << "load library failed";
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL);
+        goto end;
+    }
+
+    devHandle = m_driver->connectDev(deviceSerialNumber());
+    KLOG_DEBUG() << "devHandle:" << devHandle;
+    if (!devHandle)
     {
         KLOG_ERROR() << "Connect Dev failed";
         notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL);
-        internalStopEnroll();
-        return;
+        goto end;
     }
+    bindingUKey(devHandle,pin);
+    m_driver->disConnectDev(devHandle);
 
-    if (rebinding)
-    {
-        ULONG ulReval = m_driver->devAuth(m_devHandle);
-        if (ulReval == SAR_OK)
-        {
-            m_driver->deleteAllApplication(m_devHandle);
-            DeviceInfo deviceInfo = this->deviceInfo();
-            QStringList idList = FeatureDB::getInstance()->getFeatureIDs(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
-            Q_FOREACH (auto id, idList)
-            {
-                FeatureDB::getInstance()->deleteFeature(id);
-            }
-            bindingUKey();
-        }
-        else
-        {
-            KLOG_ERROR() << "rebinding failed";
-        }
-    }
-    else
-    {
-        bindingUKey();
-    }
+end:
     internalStopEnroll();
+    return;
 }
 
-void UKeyFTDevice::bindingUKey()
+void UKeyFTDevice::bindingUKey(DEVHANDLE devHandle, const QString &pin)
 {
-    if (isExistPublicKey())
+    HCONTAINER containerHandle;
+    HAPPLICATION appHandle;
+    ULONG ret = createContainer(pin, devHandle, &appHandle, &containerHandle);
+    if (ret != SAR_OK)
     {
-        notifyUKeyEnrollProcess(ENROLL_PROCESS_REPEATED_ENROLL);
+        KLOG_ERROR() << "create container failed:" << m_driver->getErrorReason(ret);
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL, ret);
+        m_driver->closeContainer(containerHandle);
+        m_driver->closeApplication(appHandle);
         return;
     }
-    ECCPUBLICKEYBLOB publicKey = {0};
-    ULONG ret = genKeyPair(&publicKey);
+    KLOG_DEBUG() << "create container success";
 
+    ECCPUBLICKEYBLOB publicKey = {0};
+    ret = m_driver->genECCKeyPair(containerHandle, &publicKey);
     if (ret != SAR_OK)
     {
         KLOG_ERROR() << "gen ecc key pair failed:" << m_driver->getErrorReason(ret);
         notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL, ret);
+        m_driver->closeContainer(containerHandle);
+        m_driver->closeApplication(appHandle);
         return;
     }
     KLOG_DEBUG() << "gen ecc key pair success";
@@ -131,87 +169,62 @@ void UKeyFTDevice::bindingUKey()
     QString featureID = QCryptographicHash::hash(keyFeature, QCryptographicHash::Md5).toHex();
     DeviceInfo deviceInfo = this->deviceInfo();
 
-    if (FeatureDB::getInstance()->addFeature(featureID, keyFeature, deviceInfo, deviceType()))
+    if (FeatureDB::getInstance()->addFeature(featureID, keyFeature, deviceInfo, deviceType(), deviceSerialNumber()))
     {
         notifyUKeyEnrollProcess(ENROLL_PROCESS_SUCCESS, SAR_OK, featureID);
     }
     else
     {
-        KLOG_DEBUG() << "save feature fail";
+        KLOG_ERROR() << "save feature fail";
         notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL);
     }
+
+    m_driver->closeContainer(containerHandle);
+    m_driver->closeApplication(appHandle);
 }
 
-bool UKeyFTDevice::isExistPublicKey()
+ULONG UKeyFTDevice::createContainer(const QString &pin, DEVHANDLE devHandle, HAPPLICATION *appHandle, HCONTAINER *containerHandle)
 {
-    DeviceInfo deviceInfo = this->deviceInfo();
-    auto features = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
-    if (features.count() != 0)
-    {
-        return true;
-    }
-    else
-    {
-        return false;
-    }
-}
-
-ULONG UKeyFTDevice::genKeyPair(ECCPUBLICKEYBLOB *publicKey)
-{
-    ULONG ulReval;
-    if (!isExistsApplication(UKEY_APP_NAME))
-    {
-        // NOTE:必须通过设备认证后才能在设备内创建和删除应用
-        ulReval = m_driver->devAuth(m_devHandle);
-        if (ulReval != SAR_OK)
-        {
-            KLOG_ERROR() << "Device auth failure: " << m_driver->getErrorReason(ulReval);
-            return ulReval;
-        }
-        else
-        {
-            KLOG_DEBUG() << "device auth success";
-        }
-        m_driver->deleteAllApplication(m_devHandle);
-        ulReval = m_driver->createApplication(m_devHandle, m_pin, UKEY_APP_NAME, &m_appHandle);
-        if (ulReval != SAR_OK)
-        {
-            KLOG_ERROR() << "create application failed:" << m_driver->getErrorReason(ulReval);
-            return ulReval;
-        }
-        KLOG_DEBUG() << "create application suceess";
-        ulReval = m_driver->createContainer(m_appHandle, m_pin, UKEY_CONTAINER_NAME, &m_retryCount, &m_containerHandle);
-        if (ulReval != SAR_OK)
-        {
-            KLOG_ERROR() << "create container failed:" << m_driver->getErrorReason(ulReval);
-            return ulReval;
-        }
-        KLOG_DEBUG() << "create new container success";
-    }
-    ulReval = m_driver->onOpenApplication(m_devHandle, (LPSTR)UKEY_APP_NAME, &m_appHandle);
+    // NOTE:必须通过设备认证后才能在设备内创建和删除应用
+    ULONG ulReval = m_driver->devAuth(devHandle);
     if (ulReval != SAR_OK)
     {
-        KLOG_DEBUG() << "open Application failed:" << m_driver->getErrorReason(ulReval);
+        KLOG_ERROR() << "Device auth failure: " << m_driver->getErrorReason(ulReval);
         return ulReval;
     }
-    KLOG_DEBUG() << "open Application success";
+    KLOG_DEBUG() << "device auth success";
+    m_driver->deleteAllApplication(devHandle);
 
-    ulReval = m_driver->onOpenContainer(m_appHandle, m_pin, UKEY_CONTAINER_NAME, &m_retryCount, &m_containerHandle);
+    ulReval = m_driver->createApplication(devHandle, pin, UKEY_APP_NAME, appHandle);
     if (ulReval != SAR_OK)
     {
-        KLOG_ERROR() << "open container failed:" << m_driver->getErrorReason(ulReval);
+        KLOG_ERROR() << "create application failed:" << m_driver->getErrorReason(ulReval)
+                     << " device serial number:" << deviceSerialNumber();
         return ulReval;
     }
-    KLOG_DEBUG() << "open container success";
-
-    ulReval = m_driver->genECCKeyPair(m_containerHandle, publicKey);
-
+    KLOG_DEBUG() << "create application suceess";
+    ulReval = m_driver->createContainer(*appHandle, pin, UKEY_CONTAINER_NAME, &m_retryCount, containerHandle);
     return ulReval;
 }
 
-bool UKeyFTDevice::isExistsApplication(const QString &appName)
+bool UKeyFTDevice::isExistBinding()
 {
-    QString appNames = m_driver->enumApplication(m_devHandle);
+    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(), deviceSerialNumber());
+    for (auto id : featureIDs)
+    {
+        FeatureInfo info = FeatureDB::getInstance()->getFeatureInfo(id);
+        if (info.deviceSerialNumber == deviceSerialNumber())
+        {
+            KLOG_DEBUG() << QString("Exist Binding: feature id:%1, device serial number: %2").arg(id).arg(deviceSerialNumber());
+            return true;
+        }
+    }
+    return false;
+}
+
+bool UKeyFTDevice::isExistsApplication(DEVHANDLE devHandle, const QString &appName)
+{
+    QString appNames = m_driver->enumApplication(devHandle);
     KLOG_DEBUG() << "enum app names:" << appNames;
     if (appNames.contains(appName))
     {
@@ -225,8 +238,8 @@ void UKeyFTDevice::doingIdentifyStart(const QString &value)
     KLOG_DEBUG() << "ukey identify start";
     QJsonValue ukeyValue = Utils::getValueFromJsonString(value, AUTH_DEVICE_JSON_KEY_UKEY);
     auto jsonObject = ukeyValue.toObject();
-    m_pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
-    if (m_pin.isEmpty())
+    QString pin = jsonObject.value(AUTH_DEVICE_JSON_KEY_PIN).toString();
+    if (pin.isEmpty())
     {
         QString message = tr("The pin code cannot be empty!");
         Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_NOT_MATCH, message);
@@ -239,29 +252,38 @@ void UKeyFTDevice::doingIdentifyStart(const QString &value)
     DeviceInfo deviceInfo = this->deviceInfo();
     if (m_identifyIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
+        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType(), deviceSerialNumber());
     }
     else
     {
         Q_FOREACH (auto id, m_identifyIDs)
         {
             QByteArray feature = FeatureDB::getInstance()->getFeature(id);
-            if (!feature.isEmpty())
-                saveList << feature;
+            saveList << feature;
         }
     }
 
-    if (saveList.count() != 0)
-    {
-        for (int j = 0; j < saveList.count(); j++)
-        {
-            auto saveTemplate = saveList.value(j);
-            identifyKeyFeature(saveTemplate);
-        }
-    }
-    else
+    if (saveList.count() == 0)
     {
         KLOG_DEBUG() << "no found feature id";
+        notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_NO_MATCH);
+        internalStopIdentify();
+        return;
+    }
+
+    m_driver = new UKeySKFDriver();
+    if (!m_driver->loadLibrary(FT_UKEY_DRIVER_LIB))
+    {
+        KLOG_ERROR() << "load library failed";
+        notifyUKeyEnrollProcess(ENROLL_PROCESS_FAIL);
+        internalStopIdentify();
+        return;
+    }
+
+    for (int j = 0; j < saveList.count(); j++)
+    {
+        auto savedKey = saveList.value(j);
+        identifyKeyFeature(pin,savedKey);
     }
 
     internalStopIdentify();
@@ -271,10 +293,14 @@ void UKeyFTDevice::internalStopEnroll()
 {
     if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
     {
-        closeUkey();
-        m_pin.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
+        if (m_driver)
+        {
+            KLOG_DEBUG() << "delete m_driver";
+            delete m_driver;
+            m_driver = nullptr;
+        }
         KLOG_DEBUG() << "stop Enroll";
     }
 }
@@ -283,58 +309,48 @@ void UKeyFTDevice::internalStopIdentify()
 {
     if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
     {
-        closeUkey();
         m_identifyIDs.clear();
-        m_pin.clear();
         setDeviceStatus(DEVICE_STATUS_IDLE);
         clearWatchedServices();
+        if (m_driver)
+        {
+            delete m_driver;
+            m_driver = nullptr;
+        }
         KLOG_DEBUG() << "stopIdentify";
     }
 }
 
-void UKeyFTDevice::closeUkey()
+void UKeyFTDevice::resetUkey()
 {
-    if (!m_driver->isLoaded())
-    {
-        return;
-    }
-    if (m_containerHandle)
-    {
-        m_driver->closeContainer(m_containerHandle);
-        m_containerHandle = nullptr;
-    }
-
-    if (m_appHandle)
-    {
-        m_driver->closeApplication(m_appHandle);
-        m_appHandle = nullptr;
-    }
-
-    if (m_devHandle)
-    {
-        m_driver->disConnectDev(m_devHandle);
-        m_devHandle = nullptr;
-    }
+    UKeySKFDriver driver;
+    driver.loadLibrary(FT_UKEY_DRIVER_LIB);
+    DEVHANDLE devHandle = driver.connectDev(deviceSerialNumber());
+    driver.resetUkey(devHandle);
+    KLOG_DEBUG() << "resetUkey";
 }
 
-void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
+void UKeyFTDevice::identifyKeyFeature(const QString &pin, QByteArray keyFeature)
 {
-    DEVHANDLE m_devHandle = m_driver->connectDev();
-    if (!m_devHandle)
+    DEVHANDLE devHandle = m_driver->connectDev(deviceSerialNumber());
+    if (!devHandle)
     {
         notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_NO_MATCH);
         return;
     }
 
     ULONG ret;
-    ret = m_driver->onOpenApplication(m_devHandle, (LPSTR)UKEY_APP_NAME, &m_appHandle);
+    HAPPLICATION appHandle;
+    HCONTAINER containerHandle;
+
+    ret = m_driver->onOpenApplication(devHandle, (LPSTR)UKEY_APP_NAME, &appHandle);
     if (ret != SAR_OK)
     {
         notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_NO_MATCH, ret);
         return;
     }
 
-    ret = m_driver->onOpenContainer(m_appHandle, m_pin, UKEY_CONTAINER_NAME, &m_retryCount, &m_containerHandle);
+    ret = m_driver->onOpenContainer(appHandle, pin, UKEY_CONTAINER_NAME, &m_retryCount, &containerHandle);
     if (ret != SAR_OK)
     {
         notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_NO_MATCH, ret);
@@ -342,7 +358,7 @@ void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
     }
 
     ECCSIGNATUREBLOB Signature = {0};
-    ret = m_driver->authSignData(m_containerHandle, m_devHandle, Signature);
+    ret = m_driver->authSignData(containerHandle, devHandle, Signature);
     if (ret != SAR_OK)
     {
         KLOG_DEBUG() << "auth sign data failed:" << m_driver->getErrorReason(ret);
@@ -358,7 +374,7 @@ void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
     memcpy(eccPubKey.XCoordinate, (unsigned char *)xCoordinateArray.data(), ECC_MAX_XCOORDINATE_BITS_LEN / 8);
     memcpy(eccPubKey.YCoordinate, (unsigned char *)yCoordinateArray.data(), ECC_MAX_YCOORDINATE_BITS_LEN / 8);
 
-    ret = m_driver->verifyData(m_devHandle, Signature, eccPubKey);
+    ret = m_driver->verifyData(devHandle, Signature, eccPubKey);
     if (ret != SAR_OK)
     {
         KLOG_DEBUG() << "verify data failed:" << m_driver->getErrorReason(ret);
@@ -373,10 +389,15 @@ void UKeyFTDevice::identifyKeyFeature(QByteArray keyFeature)
 
 void UKeyFTDevice::notifyUKeyEnrollProcess(EnrollProcess process, ULONG error, const QString &featureID)
 {
-    QString message, reason;
+    QString reason;
     // 目前只需要返回有关pin码的错误信息
     reason = getPinErrorReson(error);
+    if (error != SAR_OK)
+    {
+        KLOG_DEBUG() << "Ukey Error Reason:" << m_driver->getErrorReason(error);
+    }
 
+    QString message = tr("Binding user failed!");
     switch (process)
     {
     case ENROLL_PROCESS_SUCCESS:
@@ -384,18 +405,16 @@ void UKeyFTDevice::notifyUKeyEnrollProcess(EnrollProcess process, ULONG error, c
         Q_EMIT m_dbusAdaptor->EnrollStatus(featureID, 100, ENROLL_STATUS_COMPLETE, message);
         break;
     case ENROLL_PROCESS_FAIL:
-        message = tr("Binding user failed!");
         if (!reason.isEmpty())
         {
             message.append(reason);
         }
         Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
-        KLOG_DEBUG() << "Ukey Error Reason:" << m_driver->getErrorReason(error);
         break;
     case ENROLL_PROCESS_REPEATED_ENROLL:
-        message = tr("UKey has been bound");
-        Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_REPEATED, message);
+        message.append(tr("UKey has been bound"));
         Q_EMIT m_dbusAdaptor->EnrollStatus("", 0, ENROLL_STATUS_FAIL, message);
+        break;
     default:
         break;
     }

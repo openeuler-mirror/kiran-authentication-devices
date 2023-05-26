@@ -376,7 +376,7 @@ int MFIriStarDriver::startIdentify(QStringList featureIDs)
 
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct, (DeviceType)m_currentDeviceType);
+        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct, (DeviceType)m_currentDeviceType,QString());
     }
     else
     {

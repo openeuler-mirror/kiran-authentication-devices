@@ -384,7 +384,7 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
     DeviceInfo info = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct,deviceType());
+        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct,deviceType(),deviceSerialNumber());
     }
     else
     {

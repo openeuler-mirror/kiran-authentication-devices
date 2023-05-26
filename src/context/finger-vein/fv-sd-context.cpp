@@ -59,7 +59,6 @@ AuthDevicePtr FVSDContext::createDevice(const QString& idVendor, const QString& 
     }
     sdDevice->setDeviceName(deviceName);
     sdDevice->setDeviceInfo(idVendor, idProduct);
-    m_deviceMap.insert(sdDevice->deviceID(), sdDevice);
     return sdDevice;
 }
 }  // namespace Kiran

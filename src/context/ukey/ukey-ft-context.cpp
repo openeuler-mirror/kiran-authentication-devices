@@ -58,7 +58,6 @@ AuthDevicePtr UKeyFTContext::createDevice(const QString& idVendor, const QString
     }
     ftDevice->setDeviceName(deviceName);
     ftDevice->setDeviceInfo(idVendor, idProduct);
-    m_deviceMap.insert(ftDevice->deviceID(), ftDevice);
     return ftDevice;
 }
 }  // namespace Kiran

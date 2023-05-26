@@ -29,10 +29,15 @@ public:
     bool isLoaded();
     bool loadLibrary(QString libPath);
     
+    QStringList enumDevName();
+    QStringList enumDevSerialNumber();
     DEVHANDLE connectDev();
+
+    DEVHANDLE connectDev(const QString &serialNumber);
 
     void deleteAllApplication(DEVHANDLE devHandle);
     QString enumApplication(DEVHANDLE devHandle);
+    bool isExistPublicKey(HCONTAINER containerHandle);
 
     ULONG devAuth(DEVHANDLE devHandle);
     ULONG onOpenApplication(DEVHANDLE hDev, LPSTR szAppName, HAPPLICATION *appHandle);
@@ -52,13 +57,14 @@ public:
 
     ULONG changePin(DEVHANDLE devHandle, int userType, const QString &currentPin, const QString &newPin, ULONG *retryCount);
     
-
-    
     ULONG unblockPin(DEVHANDLE devHandle, const QString &adminPin, const QString &newUserPin, ULONG *retryCount);
+
+    ULONG resetUkey(DEVHANDLE devHandle);
 
     QString getErrorReason(ULONG error);
 
     QString getDefaultValueFromConf(const QString &key);
+
 
 private:
     QSharedPointer<SKFDriverLib> m_driverLib;
