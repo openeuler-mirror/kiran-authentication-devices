@@ -398,6 +398,7 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureID
 
     if (saveList.count() == 0)
     {
+        KLOG_DEBUG() << "no found feature";
         return QString();
     }
 
