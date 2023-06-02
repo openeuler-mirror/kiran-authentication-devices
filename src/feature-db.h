@@ -20,26 +20,38 @@
 
 namespace Kiran
 {
+struct FeatureInfo
+{
+    QString id;
+    QString idVendor;
+    QString idProduct;
+    int deviceType;
+    QString deviceSerialNumber;
+};
+
 class FeatureDB
 {
 public:
     explicit FeatureDB();
     ~FeatureDB();
 
-    static FeatureDB *getInstance() {return m_instance;};
+    static FeatureDB *getInstance() { return m_instance; };
     static void globalInit();
-    static void globalDeinit() {delete m_instance;};
-    
+    static void globalDeinit() { delete m_instance; };
+
     bool createDBConnection();
-    bool addFeature(const QString &featureID, QByteArray feature, DeviceInfo deviceInfo, DeviceType deviceType);
+    bool addFeature(const QString &featureID, QByteArray feature,
+                    DeviceInfo deviceInfo, DeviceType deviceType,
+                    const QString &deviceSerialNumber = QString());
     bool deleteFeature(const QString &featureID);
 
     QByteArray getFeature(const QString &featureID);
-    QList<QByteArray> getFeatures(const QString &idVendor,const QString &idProduct, DeviceType deviceType);
+    QList<QByteArray> getFeatures(const QString &idVendor, const QString &idProduct, DeviceType deviceType, const QString &deviceSerialNumber);
     QList<QByteArray> getAllFeatures();
-    QStringList getFeatureIDs(const QString &idVendor,const QString &idProduct, DeviceType deviceType);
+    QStringList getFeatureIDs(const QString &idVendor, const QString &idProduct, DeviceType deviceType, const QString &deviceSerialNumber);
     QString getFeatureID(QByteArray feature);
     QStringList getAllFeatureIDs();
+    FeatureInfo getFeatureInfo(const QString &featureID);
 
     bool updateFeature(const QString &featureID, QByteArray newFeature);
 

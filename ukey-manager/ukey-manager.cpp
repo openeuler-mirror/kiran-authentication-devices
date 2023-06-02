@@ -59,29 +59,8 @@ bool UkeyManager::initDriver()
 
 ULONG UkeyManager::resetUkey()
 {
-    ULONG ulReval = m_driver->devAuth(m_devHandle);
-    if (ulReval != SAR_OK)
-    {
-        KLOG_ERROR() << "Device authentication failed";
-        return ulReval;
-    }
-    m_driver->deleteAllApplication(m_devHandle);
-
-    ulReval = m_driver->createApplication(m_devHandle, DEFAULT_USER_PINCODE, UKEY_APP_NAME, &m_appHandle);
-    if (ulReval != SAR_OK)
-    {
-        KLOG_ERROR() << "create application failed:" << m_driver->getErrorReason(ulReval);
-        return ulReval;
-    }
-    KLOG_DEBUG() << "create application suceess";
-    ulReval = m_driver->createContainer(m_appHandle, DEFAULT_USER_PINCODE, UKEY_CONTAINER_NAME, &m_retryCount, &m_containerHandle);
-    if (ulReval != SAR_OK)
-    {
-        KLOG_ERROR() << "create container failed:" << m_driver->getErrorReason(ulReval);
-        return ulReval;
-    }
-    KLOG_DEBUG() << "create new container success";
-
+    ULONG ulReval = m_driver->resetUkey(m_devHandle);
+    m_driver->disConnectDev(m_devHandle);
     return ulReval;
 }
 
@@ -102,7 +81,6 @@ ULONG UkeyManager::changePin(const QString &userType, const QString &currentPin,
         std::cout << "invalid user type" << std::endl;
         return SAR_FAIL;
     }
-    KLOG_DEBUG() << "m_appHandle:" << m_appHandle;
     KLOG_DEBUG() << "type:" << type;
     ULONG ret = m_driver->changePin(m_devHandle, type, currentPin, newPin, retryCount);
     return ret;

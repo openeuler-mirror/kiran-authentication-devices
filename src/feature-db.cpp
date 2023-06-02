@@ -72,7 +72,8 @@ bool FeatureDB::createDBConnection()
                                       "feature BLOB NOT NULL,"
                                       "idVendor TEXT,"
                                       "idProduct TEXT,"
-                                      "deviceType INT);");
+                                      "deviceType INT,"
+                                      "deviceSerialNumber TEXT);");
 
         if (!query.exec(createTable))
         {
@@ -82,15 +83,16 @@ bool FeatureDB::createDBConnection()
     return true;
 }
 
-bool FeatureDB::addFeature(const QString &featureID, QByteArray feature, DeviceInfo deviceInfo, DeviceType deviceType)
+bool FeatureDB::addFeature(const QString &featureID, QByteArray feature, DeviceInfo deviceInfo, DeviceType deviceType, const QString &deviceSerialNumber)
 {
     QSqlQuery query(m_database);
-    query.prepare("INSERT into feature(featureID, feature, idVendor, idProduct, deviceType) VALUES(:featureID, :feature,:idVendor, :idProduct, :deviceType) ;");
+    query.prepare("INSERT into feature(featureID, feature, idVendor, idProduct, deviceType, deviceSerialNumber) VALUES(:featureID, :feature,:idVendor, :idProduct, :deviceType, :deviceSerialNumber) ;");
     query.bindValue(":featureID", featureID);
     query.bindValue(":feature", feature);
     query.bindValue(":idVendor", deviceInfo.idVendor);
     query.bindValue(":idProduct", deviceInfo.idProduct);
     query.bindValue(":deviceType", (int)deviceType);
+    query.bindValue(":deviceSerialNumber", deviceSerialNumber);
     return query.exec();
 }
 
@@ -116,13 +118,14 @@ QByteArray FeatureDB::getFeature(const QString &featureID)
     return QByteArray();
 }
 
-QList<QByteArray> FeatureDB::getFeatures(const QString &idVendor, const QString &idProduct, DeviceType deviceType)
+QList<QByteArray> FeatureDB::getFeatures(const QString &idVendor, const QString &idProduct, DeviceType deviceType, const QString &deviceSerialNumber)
 {
     QSqlQuery query(m_database);
-    query.prepare("SELECT feature  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType");
+    query.prepare("SELECT feature  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType AND deviceSerialNumber = :serialNumber");
     query.bindValue(":Vid", idVendor);
     query.bindValue(":Pid", idProduct);
     query.bindValue(":devType", (int)deviceType);
+    query.bindValue(":serialNumber", deviceSerialNumber);
     query.exec();
     QByteArrayList featuresList;
     while (query.next())
@@ -147,13 +150,14 @@ QList<QByteArray> FeatureDB::getAllFeatures()
     return featuresList;
 }
 
-QStringList FeatureDB::getFeatureIDs(const QString &idVendor, const QString &idProduct, DeviceType deviceType)
+QStringList FeatureDB::getFeatureIDs(const QString &idVendor, const QString &idProduct, DeviceType deviceType, const QString &deviceSerialNumber)
 {
     QSqlQuery query(m_database);
-    query.prepare("SELECT featureID  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType");
+    query.prepare("SELECT featureID  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType AND deviceSerialNumber = :serialNumber");
     query.bindValue(":Vid", idVendor);
     query.bindValue(":Pid", idProduct);
     query.bindValue(":devType", (int)deviceType);
+    query.bindValue(":serialNumber", deviceSerialNumber);
     query.exec();
     QStringList featureIDs;
     while (query.next())
@@ -192,6 +196,24 @@ QStringList FeatureDB::getAllFeatureIDs()
     return featureIDs;
 }
 
+FeatureInfo FeatureDB::getFeatureInfo(const QString &featureID)
+{
+    QSqlQuery query(m_database);
+    query.prepare("SELECT idVendor, idProduct, deviceType, deviceSerialNumber FROM feature WHERE featureID = :id");
+    query.bindValue(":id", featureID);
+    query.exec();
+    FeatureInfo featureInfo;
+    if (query.next())
+    {
+        featureInfo.id = featureID;
+        featureInfo.idVendor = query.value("idVendor").toString();
+        featureInfo.idProduct = query.value("idProduct").toString();
+        featureInfo.deviceType = query.value("deviceType").toInt();
+        featureInfo.deviceSerialNumber = query.value("deviceSerialNumber").toString();
+    }
+    return featureInfo;
+}
+
 bool FeatureDB::updateFeature(const QString &featureID, QByteArray newFeature)
 {
     QSqlQuery query(m_database);
@@ -212,7 +234,9 @@ bool FeatureDB::contains(const QString &featureID)
         return true;
     }
     else
+    {
         return false;
+    }
 }
 
 }  // namespace Kiran

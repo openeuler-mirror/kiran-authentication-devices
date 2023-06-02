@@ -25,6 +25,7 @@
 #include "kiran-auth-device-i.h"
 #include "polkit-proxy.h"
 #include "utils.h"
+#include  "device/ukey/ukey-ft-device.h"
 
 namespace Kiran
 {
@@ -147,11 +148,30 @@ QString AuthDeviceManager::GetDriversByType(int device_type)
 
 void AuthDeviceManager::onRemove(const QDBusMessage& message, const QString& feature_id)
 {
+    FeatureInfo featureInfo = FeatureDB::getInstance()->getFeatureInfo(feature_id);
     bool result = FeatureDB::getInstance()->deleteFeature(feature_id);
     KLOG_DEBUG() << "deleteFeature:" << feature_id
                  << "exec:" << result;
     auto replyMessage = message.createReply();
     QDBusConnection::systemBus().send(replyMessage);
+
+    if (featureInfo.deviceType == DEVICE_TYPE_UKey)
+    {
+        AuthDeviceList deviceList = m_deviceMap.values();
+        for (auto device : deviceList)
+        {
+            if (device->deviceType() != DEVICE_TYPE_UKey)
+            {
+                continue;
+            }
+            auto ukeyDevice = qobject_cast<UKeyFTDevice*>(device);
+            if (ukeyDevice->deviceSerialNumber() != featureInfo.deviceSerialNumber)
+            {
+                continue;
+            }
+            ukeyDevice->resetUkey();
+        }
+    }
 }
 
 // TODO:是否需要监听配置文件的改变
@@ -297,27 +317,30 @@ void AuthDeviceManager::handleDeviceDeleted()
     int deviceType;
     Q_FOREACH (auto busPath, oldBusList)
     {
-        if (!newBusList.contains(busPath))
+        if (newBusList.contains(busPath))
         {
-            AuthDevicePtr oldAuthDevice = m_deviceMap.value(busPath);
-            deviceID = oldAuthDevice->deviceID();
-            deviceType = oldAuthDevice->deviceType();
-            m_deviceMap.remove(busPath);
-
-            QMapIterator<DeviceInfo, int> i(m_retreyCreateDeviceMap);
-            while (i.hasNext())
-            {
-                i.next();
-                if (i.key().busPath == busPath)
-                {
-                    m_retreyCreateDeviceMap.remove(i.key());
-                }
-            }
-            KLOG_DEBUG() << "device delete: " << busPath;
-            break;
+            continue;
         }
+
+        AuthDevicePtr oldAuthDevice = m_deviceMap.value(busPath);
+        deviceID = oldAuthDevice->deviceID();
+        deviceType = oldAuthDevice->deviceType();
+        int removeCount = m_deviceMap.remove(busPath);
+        oldAuthDevice.clear();
+        Q_EMIT m_dbusAdaptor->DeviceDeleted(deviceType, deviceID);
+
+        QMapIterator<DeviceInfo, int> i(m_retreyCreateDeviceMap);
+        while (i.hasNext())
+        {
+            i.next();
+            if (i.key().busPath == busPath)
+            {
+                m_retreyCreateDeviceMap.remove(i.key());
+            }
+        }
+        KLOG_DEBUG() << "device delete: " << busPath;
+        break;
     }
-    Q_EMIT m_dbusAdaptor->DeviceDeleted(deviceType, deviceID);
 }
 
 void AuthDeviceManager::handleDeviceReCreate()
@@ -325,43 +348,40 @@ void AuthDeviceManager::handleDeviceReCreate()
     if (m_retreyCreateDeviceMap.count() == 0)
     {
         m_timer.stop();
+        return;
     }
-    else
+
+    QMapIterator<DeviceInfo, int> i(m_retreyCreateDeviceMap);
+    while (i.hasNext())
     {
-        QMapIterator<DeviceInfo, int> i(m_retreyCreateDeviceMap);
-        while (i.hasNext())
+        i.next();
+        if (i.value() >= 2)
         {
-            i.next();
-            if (i.value() >= 2)
-            {
-                m_retreyCreateDeviceMap.remove(i.key());
-            }
-            else
-            {
-                auto deviceInfo = i.key();
-                AuthDeviceList deviceList = m_contextFactory->createDevices(deviceInfo.idVendor, deviceInfo.idProduct);
-                if (deviceList.count() != 0)
-                {
-                    Q_FOREACH (auto device, deviceList)
-                    {
-                        m_deviceMap.insert(deviceInfo.busPath, device);
-                        Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
-                        Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
-
-                        KLOG_DEBUG() << "device added"
-                                     << "idVendor:" << deviceInfo.idVendor
-                                     << "idProduct:" << deviceInfo.idProduct
-                                     << "bus:" << deviceInfo.busPath;
-                    }
-
-                    m_retreyCreateDeviceMap.remove(i.key());
-                }
-                else
-                {
-                    m_retreyCreateDeviceMap.insert(i.key(), i.value() + 1);
-                }
-            }
+            m_retreyCreateDeviceMap.remove(i.key());
+            continue;
         }
+
+        auto deviceInfo = i.key();
+        AuthDeviceList deviceList = m_contextFactory->createDevices(deviceInfo.idVendor, deviceInfo.idProduct);
+        if (deviceList.count() == 0)
+        {
+            m_retreyCreateDeviceMap.insert(i.key(), i.value() + 1);
+            continue;
+        }
+
+        Q_FOREACH (auto device, deviceList)
+        {
+            m_deviceMap.insert(deviceInfo.busPath, device);
+            Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
+            Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
+
+            KLOG_DEBUG() << "device added"
+                         << "idVendor:" << deviceInfo.idVendor
+                         << "idProduct:" << deviceInfo.idProduct
+                         << "bus:" << deviceInfo.busPath;
+        }
+
+        m_retreyCreateDeviceMap.remove(i.key());
     }
 }
 }  // namespace Kiran

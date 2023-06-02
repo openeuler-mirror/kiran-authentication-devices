@@ -81,8 +81,6 @@ AuthDevicePtr MultiFunctionContext::createIriStarDevice(const QString& idVendor,
     iriStarDevice->setDeviceName(deviceName);
     iriStarDevice->setDeviceInfo(idVendor, idProduct);
 
-    m_deviceMap.insert(iriStarDevice->deviceID(), iriStarDevice);
-
     return iriStarDevice;
 }
 

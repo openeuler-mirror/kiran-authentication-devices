@@ -14,10 +14,11 @@
 
 #pragma once
 #include <stdint.h>
+#include <QSharedPointer>
+#include <QTimer>
 #include "device/auth-device.h"
 #include "driver/ukey/ukey-skf-driver.h"
 #include "ukey-skf.h"
-#include <QSharedPointer>
 
 namespace Kiran
 {
@@ -30,33 +31,34 @@ public:
 
     bool initDriver() override;
 
+    void resetUkey();
+
+private Q_SLOTS:
+    bool initSerialNumber();
+
 private:
     void doingEnrollStart(const QString &extraInfo) override;
     void doingIdentifyStart(const QString &value) override;
-    
+
     void internalStopEnroll() override;
     void internalStopIdentify() override;
 
-    void identifyKeyFeature(QByteArray keyFeature);
-    
-    void bindingUKey();
-    ULONG genKeyPair(ECCPUBLICKEYBLOB *publicKey);
-    bool isExistPublicKey();
-    bool isExistsApplication(const QString &appName);
+    void identifyKeyFeature(const QString &pin, QByteArray keyFeature);
 
+    void bindingUKey(DEVHANDLE devHandle, const QString &pin);
+    ULONG createContainer(const QString &pin, DEVHANDLE devHandle, HAPPLICATION *appHandle, HCONTAINER *containerHandle);
+    bool isExistsApplication(DEVHANDLE devHandle, const QString &appName);
+    bool isExistBinding();
     void notifyUKeyEnrollProcess(EnrollProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
     void notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
 
     QString getPinErrorReson(ULONG error);
 
-    void closeUkey();
 private:
-    DEVHANDLE m_devHandle;
-    HAPPLICATION m_appHandle;
-    HCONTAINER m_containerHandle;
     ULONG m_retryCount = 1000000;
-    QString m_pin;
-    QSharedPointer<UKeySKFDriver> m_driver;
+    UKeySKFDriver *m_driver = nullptr;
+    static QStringList m_existingSerialNumber;
+    QTimer m_reInitSerialNumberTimer;
 };
 
 }  // namespace Kiran

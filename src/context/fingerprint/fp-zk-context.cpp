@@ -63,7 +63,6 @@ AuthDevicePtr FPZKContext::createDevice(const QString& idVendor, const QString& 
     }
     zkDevice->setDeviceName(deviceName);
     zkDevice->setDeviceInfo(idVendor, idProduct);
-    m_deviceMap.insert(zkDevice->deviceID(), zkDevice);
     return zkDevice;
 }
 }  // namespace Kiran

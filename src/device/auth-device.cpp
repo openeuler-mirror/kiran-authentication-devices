@@ -194,7 +194,7 @@ CHECK_AUTH(AuthDevice, IdentifyStop, onIdentifyStop, AUTH_USER_ADMIN)
 
 QStringList AuthDevice::GetFeatureIDList()
 {
-    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct,deviceType());
+    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct,deviceType(),deviceSerialNumber());
     return featureIDs;
 }
 
