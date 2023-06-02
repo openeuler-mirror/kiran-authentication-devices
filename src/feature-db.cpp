@@ -92,7 +92,7 @@ bool FeatureDB::addFeature(const QString &featureID, QByteArray feature, DeviceI
     query.bindValue(":idVendor", deviceInfo.idVendor);
     query.bindValue(":idProduct", deviceInfo.idProduct);
     query.bindValue(":deviceType", (int)deviceType);
-    query.bindValue(":deviceSerialNumber", deviceSerialNumber);
+    query.bindValue(":deviceSerialNumber", deviceSerialNumber.isEmpty() ? QVariant(QVariant::String) : deviceSerialNumber);
     return query.exec();
 }
 
@@ -121,12 +121,19 @@ QByteArray FeatureDB::getFeature(const QString &featureID)
 QList<QByteArray> FeatureDB::getFeatures(const QString &idVendor, const QString &idProduct, DeviceType deviceType, const QString &deviceSerialNumber)
 {
     QSqlQuery query(m_database);
-    query.prepare("SELECT feature  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType AND deviceSerialNumber = :serialNumber");
+    QString sql = "SELECT feature  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType";
+    if (!deviceSerialNumber.isEmpty())
+    {
+        sql.append(" AND deviceSerialNumber = :serialNumber");
+    }
+
+    query.prepare(sql);
     query.bindValue(":Vid", idVendor);
     query.bindValue(":Pid", idProduct);
     query.bindValue(":devType", (int)deviceType);
     query.bindValue(":serialNumber", deviceSerialNumber);
     query.exec();
+
     QByteArrayList featuresList;
     while (query.next())
     {
@@ -153,7 +160,12 @@ QList<QByteArray> FeatureDB::getAllFeatures()
 QStringList FeatureDB::getFeatureIDs(const QString &idVendor, const QString &idProduct, DeviceType deviceType, const QString &deviceSerialNumber)
 {
     QSqlQuery query(m_database);
-    query.prepare("SELECT featureID  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType AND deviceSerialNumber = :serialNumber");
+    QString sql = "SELECT featureID  FROM feature WHERE idVendor = :Vid AND idProduct = :Pid AND deviceType = :devType";
+    if (!deviceSerialNumber.isEmpty())
+    {
+        sql.append(" AND deviceSerialNumber = :serialNumber");
+    }
+
     query.bindValue(":Vid", idVendor);
     query.bindValue(":Pid", idProduct);
     query.bindValue(":devType", (int)deviceType);
