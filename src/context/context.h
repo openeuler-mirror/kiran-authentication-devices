@@ -29,11 +29,7 @@ class Context : public QObject
 public:
     explicit Context(QObject *parent = nullptr);
     virtual AuthDevicePtr createDevice(const QString &idVendor, const QString &idProduct) = 0;
-    virtual AuthDeviceList getDevices() { return m_deviceMap.values(); };
 
-protected:
-    QMap<QString, AuthDevicePtr> m_deviceMap;
-    AuthDevicePtr m_device;
 };
 
 }  // namespace Kiran

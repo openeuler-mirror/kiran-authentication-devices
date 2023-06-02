@@ -52,12 +52,14 @@ public:
     DeviceStatus deviceStatus() { return m_deviceStatus; };
     QString deviceName() { return m_deviceName; };
     DeviceInfo deviceInfo();
+    QString deviceSerialNumber() { return m_serialNumber; };
 
     void setDeviceType(DeviceType deviceType) { m_deviceType = deviceType; };
     void setDeviceStatus(DeviceStatus deviceStatus) { m_deviceStatus = deviceStatus; };
     void setDeviceName(const QString &deviceName) { m_deviceName = deviceName; };
     void setDeviceInfo(const QString &idVendor, const QString &idProduct);
     void setDeviceDriver(const QString &deviceDriver);
+    void setDeviceSerialNumber(const QString &serialNumber) {m_serialNumber = serialNumber;};
 
 public Q_SLOTS:
     virtual void EnrollStart(const QString &extraInfo);
@@ -104,6 +106,7 @@ private:
     QString m_deviceName;
     QString m_idVendor;
     QString m_idProduct;
+    QString m_serialNumber;
     QDBusObjectPath m_objectPath;
     QSharedPointer<QDBusServiceWatcher> m_serviceWatcher;
 

@@ -399,7 +399,7 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
     DeviceInfo deviceInfo = this->deviceInfo();
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType());
+        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType(),deviceSerialNumber());
     }
     else
     {

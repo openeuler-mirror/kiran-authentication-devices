@@ -180,46 +180,123 @@ bool UKeySKFDriver::isLoaded()
     return m_driverLib->isLoaded;
 }
 
-DEVHANDLE UKeySKFDriver::connectDev()
+QStringList UKeySKFDriver::enumDevName()
 {
     ULONG ulBufSize = 0;
     ULONG ulReval = m_driverLib->SKF_EnumDev(TRUE, NULL, &ulBufSize);
     if (ulReval != SAR_OK)
     {
         KLOG_DEBUG() << "Enum Dev error:" << getErrorReason(ulReval);
-        return nullptr;
+        return QStringList();
     }
 
     LPSTR szNameList = (LPSTR)malloc(ulBufSize * sizeof(CHAR));
     memset(szNameList, '\0', ulBufSize);
     ulReval = m_driverLib->SKF_EnumDev(TRUE, szNameList, &ulBufSize);
-    if (ulReval == SAR_OK)
+    if ((ulReval != SAR_OK))
     {
-        LPSTR pszTemp = szNameList;
-        if (NULL == pszTemp)
+        KLOG_DEBUG() << "Enum Dev error:" << getErrorReason(ulReval);
+        free(szNameList);
+        return QStringList();
+    }
+
+    LPSTR pszTemp = szNameList;
+    if (NULL == pszTemp)
+    {
+        KLOG_DEBUG() << "no found ukey device";
+        free(szNameList);
+        return QStringList();
+    }
+
+    QStringList nameList;
+    while ((*pszTemp != '\0') && (*(pszTemp + 1) != '\0'))
+    {
+        nameList << QString::fromLatin1((const char *)pszTemp, strlen((const char *)pszTemp));
+        pszTemp += strlen((const char *)pszTemp) + 1;
+    }
+    KLOG_DEBUG() << "device name list:" << nameList;
+
+    free(szNameList);
+    return nameList;
+}
+
+QStringList UKeySKFDriver::enumDevSerialNumber()
+{
+    QStringList devNameList = enumDevName();
+    QStringList serialNumberList;
+    for (auto devName : devNameList)
+    {
+        DEVHANDLE devHandle;
+        ULONG pulDevState;
+        QByteArray devNameArray = devName.toLatin1();
+        unsigned char *szDevName = (unsigned char *)devNameArray.data();
+        ULONG ulReval = m_driverLib->SKF_ConnectDev(szDevName, &devHandle);
+        if (SAR_OK != ulReval)
         {
-            KLOG_DEBUG() << "no found ukey device";
-            return nullptr;
+            continue;
         }
-        while (*pszTemp != '\0')
+        DEVINFO devInfo;
+        m_driverLib->SKF_GetDevInfo(devHandle, &devInfo);
+        serialNumberList << QString((const char *)devInfo.SerialNumber);
+        m_driverLib->SKF_DisConnectDev(devHandle);
+    }
+    KLOG_DEBUG() << "dev serial number list:" << serialNumberList;
+    return serialNumberList;
+}
+
+DEVHANDLE UKeySKFDriver::connectDev()
+{
+    QStringList devNameList = enumDevName();
+    for (auto devName : devNameList)
+    {
+        DEVHANDLE devHandle;
+        ULONG pulDevState;
+        QByteArray devNameArray = devName.toLatin1();
+        unsigned char *szDevName = (unsigned char *)devNameArray.data();
+        ULONG ulReval = m_driverLib->SKF_ConnectDev(szDevName, &devHandle);
+        if (SAR_OK == ulReval)
         {
-            DEVHANDLE devHandle;
-            ulReval = m_driverLib->SKF_ConnectDev(pszTemp, &devHandle);
-            if (SAR_OK == ulReval)
-            {
-                return devHandle;
-            }
-            else
-            {
-                KLOG_ERROR() << "Connect Dev failed:" << getErrorReason(ulReval);
-            }
-            pszTemp += strlen((const char *)pszTemp) + 1;
+            KLOG_DEBUG() << "connect dev success";
+            return devHandle;
+        }
+        else
+        {
+            KLOG_ERROR() << "Connect Dev failed:" << getErrorReason(ulReval);
         }
     }
-    free(szNameList);
+
     return nullptr;
 }
 
+DEVHANDLE UKeySKFDriver::connectDev(const QString &serialNumber)
+{
+    QStringList devNameList = enumDevName();
+    for (auto devName : devNameList)
+    {
+        DEVHANDLE devHandle;
+        QByteArray devNameArray = devName.toLatin1();
+        unsigned char *szDevName = (unsigned char *)devNameArray.data();
+        ULONG ulReval = m_driverLib->SKF_ConnectDev(szDevName, &devHandle);
+        if (ulReval != SAR_OK)
+        {
+            KLOG_ERROR() << QString("Connect Dev %1 failed:").arg(devName) << getErrorReason(ulReval);
+            continue;
+        }
+
+        DEVINFO devInfo;
+        m_driverLib->SKF_GetDevInfo(devHandle, &devInfo);
+        if (serialNumber == QString((const char *)devInfo.SerialNumber))
+        {
+            KLOG_DEBUG() << QString("Connect Dev %1 success, SerialNumber: %2").arg(devName).arg(serialNumber);
+            return devHandle;
+        }
+        else
+        {
+            m_driverLib->SKF_DisConnectDev(devHandle);
+        }
+    }
+    return nullptr;
+}
 
 void UKeySKFDriver::deleteAllApplication(DEVHANDLE devHandle)
 {
@@ -259,6 +336,23 @@ QString UKeySKFDriver::enumApplication(DEVHANDLE devHandle)
     else
     {
         return QString();
+    }
+}
+
+bool UKeySKFDriver::isExistPublicKey(HCONTAINER containerHandle)
+{
+    unsigned char *pPubKey = NULL;
+    ULONG ulPubKeyLen = 0;
+    ULONG ret = m_driverLib->SKF_ExportPublicKey(containerHandle, TRUE, pPubKey, &ulPubKeyLen);
+    pPubKey = (unsigned char *)malloc(ulPubKeyLen);
+    ret = m_driverLib->SKF_ExportPublicKey(containerHandle, TRUE, pPubKey, &ulPubKeyLen);
+    if (ret == SAR_OK)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
     }
 }
 
@@ -340,7 +434,8 @@ void UKeySKFDriver::closeContainer(HCONTAINER containerHandle)
 
 void UKeySKFDriver::disConnectDev(DEVHANDLE devHandle)
 {
-    m_driverLib->SKF_DisConnectDev(devHandle);
+    ULONG ret = m_driverLib->SKF_DisConnectDev(devHandle);
+    KLOG_DEBUG() << "getErrorReason(ret):" << getErrorReason(ret);
 }
 
 ULONG UKeySKFDriver::createApplication(DEVHANDLE devHandle, QString pin, QString appName, HAPPLICATION *appHandle)
@@ -524,6 +619,18 @@ ULONG UKeySKFDriver::unblockPin(DEVHANDLE devHandle, const QString &adminPin, co
     unsigned char *szNewUserPIN = (unsigned char *)newUserPinArray.data();
 
     ulReval = m_driverLib->SKF_UnblockPIN(appHandle, szAdminPin, szNewUserPIN, retryCount);
+    return ulReval;
+}
+
+ULONG UKeySKFDriver::resetUkey(DEVHANDLE devHandle)
+{
+    ULONG ulReval = devAuth(devHandle);
+    if (ulReval != SAR_OK)
+    {
+        KLOG_ERROR() << "Device authentication failed";
+        return ulReval;
+    }
+    deleteAllApplication(devHandle);
     return ulReval;
 }
 
