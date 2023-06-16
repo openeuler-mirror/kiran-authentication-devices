@@ -210,6 +210,7 @@ ULONG UKeyFTDevice::createContainer(const QString &pin, DEVHANDLE devHandle, HAP
 bool UKeyFTDevice::isExistBinding()
 {
     QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(), deviceSerialNumber());
+    KLOG_DEBUG() << "Existing Binding featureIDs:" << featureIDs;
     for (auto id : featureIDs)
     {
         FeatureInfo info = FeatureDB::getInstance()->getFeatureInfo(id);

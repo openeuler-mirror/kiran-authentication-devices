@@ -166,6 +166,7 @@ QStringList FeatureDB::getFeatureIDs(const QString &idVendor, const QString &idP
         sql.append(" AND deviceSerialNumber = :serialNumber");
     }
 
+    query.prepare(sql);
     query.bindValue(":Vid", idVendor);
     query.bindValue(":Pid", idProduct);
     query.bindValue(":devType", (int)deviceType);
