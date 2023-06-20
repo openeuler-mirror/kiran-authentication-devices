@@ -159,11 +159,7 @@ void UKeyFTDevice::bindingUKey(DEVHANDLE devHandle, const QString &pin)
      * 不用保存PublicKey和systemUser的关系,目前只有一个用户
      */
     QByteArray keyFeature;
-    QByteArray xCoordinateArray((char *)publicKey.XCoordinate, 64);
-    QByteArray yCoordinateArray((char *)publicKey.YCoordinate, 64);
-    keyFeature.append(publicKey.BitLen);
-    keyFeature.append(xCoordinateArray);
-    keyFeature.append(yCoordinateArray);
+    keyFeature.append((char *)&publicKey,sizeof(publicKey));
     KLOG_DEBUG() << "keyFeature:" << keyFeature;
 
     QString featureID = QCryptographicHash::hash(keyFeature, QCryptographicHash::Md5).toHex();
@@ -298,7 +294,7 @@ void UKeyFTDevice::internalStopEnroll()
         clearWatchedServices();
         if (m_driver)
         {
-            KLOG_DEBUG() << "delete m_driver";
+            KLOG_DEBUG() << "delete driver";
             delete m_driver;
             m_driver = nullptr;
         }
@@ -367,14 +363,7 @@ void UKeyFTDevice::identifyKeyFeature(const QString &pin, QByteArray keyFeature)
         return;
     }
 
-    ECCPUBLICKEYBLOB eccPubKey;
-    eccPubKey.BitLen = keyFeature.left(1).at(0);
-    auto xCoordinateArray = keyFeature.mid(1, sizeof(eccPubKey.XCoordinate));
-    auto yCoordinateArray = keyFeature.mid(sizeof(eccPubKey.XCoordinate) + 1);
-
-    memcpy(eccPubKey.XCoordinate, (unsigned char *)xCoordinateArray.data(), ECC_MAX_XCOORDINATE_BITS_LEN / 8);
-    memcpy(eccPubKey.YCoordinate, (unsigned char *)yCoordinateArray.data(), ECC_MAX_YCOORDINATE_BITS_LEN / 8);
-
+    ECCPUBLICKEYBLOB *eccPubKey = (ECCPUBLICKEYBLOB *)keyFeature.data();
     ret = m_driver->verifyData(devHandle, Signature, eccPubKey);
     if (ret != SAR_OK)
     {

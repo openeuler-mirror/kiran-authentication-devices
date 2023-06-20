@@ -53,7 +53,7 @@ public:
     ULONG genECCKeyPair(HCONTAINER containerHandle, ECCPUBLICKEYBLOB *pBlob);
 
     ULONG authSignData(HCONTAINER containerHandle, DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature);
-    ULONG verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature, ECCPUBLICKEYBLOB &publicKey);
+    ULONG verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature, ECCPUBLICKEYBLOB *publicKey);
 
     ULONG changePin(DEVHANDLE devHandle, int userType, const QString &currentPin, const QString &newPin, ULONG *retryCount);
     
