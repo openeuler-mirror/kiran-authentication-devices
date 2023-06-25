@@ -20,7 +20,7 @@ class BioDevice : public AuthDevice
 {
     Q_OBJECT
 public:
-    explicit BioDevice(QObject *parent = nullptr);
+    explicit BioDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject *parent = nullptr);
     ~BioDevice();
     int mergeTemplateCount() { return m_mergeTemplateCount; };
     void setMergeTemplateCount(int count) { m_mergeTemplateCount = count; };

@@ -16,37 +16,43 @@
 #include <qt5-log-i.h>
 #include <QMetaType>
 #include "auth_device_adaptor.h"
+#include "utils.h"
+#include "device/device-creator.h"
+#include "config-helper.h"
 
 namespace Kiran
 {
 #define IRIS_IS_DRIVER_LIB "libirs_sdk2.so"
 
-MFIriStarDevice::MFIriStarDevice(DeviceType deviceType, QObject *parent) : AuthDevice(parent)
+REGISTER_DEVICE(IRISTAR_DRIVER_NAME,MFIriStarDevice);
+
+MFIriStarDevice::MFIriStarDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent) : 
+                                AuthDevice(vid, pid, driver, parent)
 {
-    setDeviceType(deviceType);
-    setDeviceDriver(IRIS_IS_DRIVER_LIB);
-    m_driver = MFIriStarDriver::getInstance();
+    setDeviceName(ConfigHelper::getDriverName(vid,pid));
+    
+    m_driver = driver.dynamicCast<MFIriStarDriver>();
     m_driver->ref();
+    m_driver->setDeviceInfo(vid,pid);
 
     qRegisterMetaType<EnrollProcess>("EnrollProcess");
     qRegisterMetaType<IdentifyProcess>("IdentifyProcess");
     qRegisterMetaType<DeviceType>("DeviceType");
 
-    connect(m_driver, &MFIriStarDriver::enrollProcess, this, &MFIriStarDevice::onEnrollProcess);
-    connect(m_driver, &MFIriStarDriver::identifyProcess, this, &MFIriStarDevice::onIdentifyProcess);
+    connect(m_driver.data(), &MFIriStarDriver::enrollProcess, this, &MFIriStarDevice::onEnrollProcess);
+    connect(m_driver.data(), &MFIriStarDriver::identifyProcess, this, &MFIriStarDevice::onIdentifyProcess);
 }
 
 MFIriStarDevice::~MFIriStarDevice()
 {
     m_driver->unref();
-    KLOG_DEBUG() << "refCount:" << m_driver->refCount();
     if (m_driver->refCount() <= 0)
     {
-        delete m_driver;
+        m_driver.clear();
     }
 }
 
-bool MFIriStarDevice::initDriver()
+bool MFIriStarDevice::initDevice()
 {
     if (!m_driver->isInitialized())
     {
@@ -83,7 +89,7 @@ void MFIriStarDevice::doingIdentifyStart(const QString &value)
     {
         message = tr("Please look towards the camera");
     }
-    m_dbusAdaptor->IdentifyStatus("",ENROLL_STATUS_NORMAL, message);
+    m_dbusAdaptor->IdentifyStatus("", ENROLL_STATUS_NORMAL, message);
 }
 
 void MFIriStarDevice::internalStopEnroll()

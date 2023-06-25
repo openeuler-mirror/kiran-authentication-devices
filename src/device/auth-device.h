@@ -21,6 +21,7 @@
 #include <QObject>
 #include <QSharedPointer>
 #include "auth-enum.h"
+#include "driver/driver.h"
 #include "kiran-auth-device-i.h"
 
 class AuthDeviceAdaptor;
@@ -34,32 +35,27 @@ class AuthDevice : public QObject, protected QDBusContext
 {
     Q_OBJECT
     Q_PROPERTY(QString DeviceID READ deviceID CONSTANT)
-    Q_PROPERTY(QString DeviceDriver READ deviceDriver CONSTANT)
+    Q_PROPERTY(QString DeviceDriver READ driverName CONSTANT)
     Q_PROPERTY(int DeviceType READ deviceType)
     Q_PROPERTY(int DeviceStatus READ deviceStatus)
 
 public:
-    explicit AuthDevice(QObject *parent = nullptr);
+    explicit AuthDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
     virtual ~AuthDevice();
     bool init();
-    virtual bool initDriver() = 0;
+    virtual bool initDevice() = 0;
 
     QDBusObjectPath getObjectPath() { return m_objectPath; };
-    QString deviceID() { return m_deviceID; };
-    QString deviceDriver() { return m_deviceDriver; };
-
+    void setDeviceType(DeviceType deviceType) { m_deviceType = deviceType; };
+    
     DeviceType deviceType() { return m_deviceType; };
     DeviceStatus deviceStatus() { return m_deviceStatus; };
-    QString deviceName() { return m_deviceName; };
     DeviceInfo deviceInfo();
+    QString deviceName() { return m_deviceName; };
     QString deviceSerialNumber() { return m_serialNumber; };
+    QString deviceID() { return m_deviceID; };
 
-    void setDeviceType(DeviceType deviceType) { m_deviceType = deviceType; };
-    void setDeviceStatus(DeviceStatus deviceStatus) { m_deviceStatus = deviceStatus; };
-    void setDeviceName(const QString &deviceName) { m_deviceName = deviceName; };
-    void setDeviceInfo(const QString &idVendor, const QString &idProduct);
-    void setDeviceDriver(const QString &deviceDriver);
-    void setDeviceSerialNumber(const QString &serialNumber) {m_serialNumber = serialNumber;};
+    QString driverName() { return m_driverName; };
 
 public Q_SLOTS:
     virtual void EnrollStart(const QString &extraInfo);
@@ -69,6 +65,13 @@ public Q_SLOTS:
     virtual QStringList GetFeatureIDList();
 
 protected:
+    void setDeviceStatus(DeviceStatus deviceStatus) { m_deviceStatus = deviceStatus; };
+    void setDeviceName(const QString &deviceName) { m_deviceName = deviceName; };
+    void setDeviceInfo(const QString &idVendor, const QString &idProduct);
+    void setDeviceSerialNumber(const QString &serialNumber) { m_serialNumber = serialNumber; };
+
+    void setDriverName(const QString &driverName) { m_driverName = driverName; };
+
     void clearWatchedServices();
     virtual void internalStopEnroll() = 0;
     virtual void internalStopIdentify() = 0;
@@ -97,7 +100,7 @@ protected:
     QStringList m_identifyIDs;
 
 private:
-    QString m_deviceDriver;
+    QString m_driverName;
     QString m_deviceID;
 
     DeviceType m_deviceType;

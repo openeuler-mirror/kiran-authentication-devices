@@ -12,7 +12,6 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 
-#include <functional>
 #include "mf-iristar-driver.h"
 #include <dlfcn.h>
 #include <qt5-log-i.h>
@@ -20,9 +19,10 @@
 #include <QCryptographicHash>
 #include <functional>
 #include <iostream>
+#include "auth-enum.h"
 #include "auth_device_adaptor.h"
+#include "driver/driver-factory.h"
 #include "feature-db.h"
-#include "third-party-device.h"
 
 namespace Kiran
 {
@@ -95,27 +95,12 @@ struct IriStarDriverLib
     bool isLoaded = false;
 };
 
-// FIXME:此处使用单例是因为使用静态函数方法实现的回调函数，在生成多个对象时，回调函数的调用会有问题；使用单例不太合适，之后记得修改
-MFIriStarDriver *MFIriStarDriver::getInstance()
-{
-    static QMutex mutex;
-    static QScopedPointer<MFIriStarDriver> pInst;
-    if (Q_UNLIKELY(!pInst))
-    {
-        QMutexLocker locker(&mutex);
-        if (pInst.isNull())
-        {
-            pInst.reset(new MFIriStarDriver());
-        }
-    }
-    return pInst.data();
-}
+REGISTER_DRIVER(IRISTAR_DRIVER_NAME, MFIriStarDriver);
 
-MFIriStarDriver::MFIriStarDriver(QObject *parent) : QObject{parent}
+MFIriStarDriver::MFIriStarDriver(QObject *parent) : Driver{parent}
 {
     m_driverLib = QSharedPointer<IriStarDriverLib>(new IriStarDriverLib);
-    m_idVendor = IRISTAR_ID_VENDOR;
-    m_idProduct = IRISTAR_ID_PRODUCT;
+    setName(IRISTAR_DRIVER_NAME);
 
     connect(this, &MFIriStarDriver::addFeature, this, &MFIriStarDriver::onStartEnroll);
     connect(this, &MFIriStarDriver::featureExist, this, [this](const QString &featureID)
@@ -142,7 +127,7 @@ MFIriStarDriver::~MFIriStarDriver()
         bool enable = false;
         m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_IRIS_LIGHT, &enable, sizeof(enable));
         m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_CANCEL_OPR, NULL, 0);  // 停止当前正在进行的流程
-        m_driverLib->IRS_releaseInstance(m_irsHandle);    
+        m_driverLib->IRS_releaseInstance(m_irsHandle);
     }
 
     if (m_libHandle)
@@ -154,9 +139,11 @@ MFIriStarDriver::~MFIriStarDriver()
     m_driverLib.clear();
 }
 
-bool MFIriStarDriver::initDriver()
+bool MFIriStarDriver::initDriver(const QString &libPath)
 {
-    if (!loadLib())
+    QString loadLibPath;
+    libPath.isEmpty() ? (loadLibPath = IRIS_IS_DRIVER_LIB) : (loadLibPath = libPath);
+    if (!loadLibrary(loadLibPath))
     {
         return false;
     }
@@ -257,10 +244,10 @@ bool MFIriStarDriver::initDeviceHandle()
     return true;
 }
 
-bool MFIriStarDriver::loadLib()
+bool MFIriStarDriver::loadLibrary(const QString &libPath)
 {
     // 打开指定的动态链接库文件；立刻决定返回前接触所有未决定的符号。若打开错误返回NULL，成功则返回库引用
-    m_libHandle = dlopen(IRIS_IS_DRIVER_LIB, RTLD_NOW);
+    m_libHandle = dlopen(libPath.toStdString().c_str(), RTLD_NOW);
     if (m_libHandle == NULL)
     {
         KLOG_ERROR() << "Load libirs_sdk2.so failed,error:" << dlerror();
@@ -354,6 +341,11 @@ void MFIriStarDriver::setDeviceInfo(const QString &idVendor, const QString &idPr
     m_idProduct = idProduct;
 }
 
+bool MFIriStarDriver::isLoaded()
+{
+    return m_driverLib->isLoaded;
+}
+
 int MFIriStarDriver::prepareEnroll(const char *objectType)
 {
     KLOG_DEBUG() << "prepareEnroll";
@@ -376,7 +368,7 @@ int MFIriStarDriver::startIdentify(QStringList featureIDs)
 
     if (featureIDs.isEmpty())
     {
-        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct, (DeviceType)m_currentDeviceType,QString());
+        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct, (DeviceType)m_currentDeviceType, QString());
     }
     else
     {
@@ -646,7 +638,6 @@ void MFIriStarDriver::handleRecognized(IRS_Results *results)
     }
     else
     {
-        
         if (m_algorithmType == ALGORITHM_TYPE_IRIS)
         {
             Q_EMIT identifyProcess(IDENTIFY_PROCESS_MACTCH, DEVICE_TYPE_Iris, featureID);
@@ -683,7 +674,7 @@ void MFIriStarDriver::handleFaceEnrolled(IRS_Results *results)
 {
     if (results->faceData.image.dataLen <= 0 || !(results->faceData.image.data))
     {
-        Q_EMIT enrollProcess(ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL,DEVICE_TYPE_Face);
+        Q_EMIT enrollProcess(ENROLL_PROCESS_ACQUIRE_FEATURE_FAIL, DEVICE_TYPE_Face);
         return;
     }
     QByteArray faceFeature((char *)results->faceData.featureData, results->faceData.featureDataLen);

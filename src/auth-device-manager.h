@@ -73,7 +73,6 @@ private:
     QSharedPointer<AuthDeviceManagerAdaptor> m_dbusAdaptor;
     // 总线 -- AuthDevice对象对应
     QMultiMap<QString, QSharedPointer<AuthDevice>> m_deviceMap;
-    QSharedPointer<ContextFactory> m_contextFactory;
     QTimer m_timer;
 
     // 设备信息-重试次数
