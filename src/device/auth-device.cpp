@@ -22,20 +22,23 @@
 #include "kiran-auth-device-i.h"
 #include "polkit-proxy.h"
 #include "utils.h"
+#include "config-helper.h"
 
 namespace Kiran
 {
 size_t AuthDevice::m_deviceObjectNum = 0;
 
-AuthDevice::AuthDevice(QObject* parent) : QObject(parent)
+AuthDevice::AuthDevice(const QString& vid, const QString& pid, DriverPtr driver, QObject* parent) : QObject(parent)
 {
+    setDeviceInfo(vid, pid);
+    setDeviceName(ConfigHelper::getDeviceName(vid, pid));
 }
 
 AuthDevice::~AuthDevice(){};
 
 bool AuthDevice::init()
 {
-    if (!initDriver())
+    if(!initDevice())
     {
         return false;
     }
@@ -117,20 +120,6 @@ void AuthDevice::setDeviceInfo(const QString& idVendor, const QString& idProduct
     m_idProduct = idProduct;
 }
 
-void AuthDevice::setDeviceDriver(const QString& deviceDriver)
-{
-    QString driverName;
-    if (deviceDriver.startsWith("lib"))
-    {
-        driverName = deviceDriver.mid(3, deviceDriver.indexOf(".so") - 3);
-    }
-    else
-    {
-        driverName = deviceDriver;
-    }
-    m_deviceDriver = driverName;
-}
-
 void AuthDevice::onEnrollStart(const QDBusMessage& dbusMessage, const QString& extraInfo)
 {
     QString message;
@@ -198,7 +187,7 @@ CHECK_AUTH(AuthDevice, IdentifyStop, onIdentifyStop, AUTH_USER_ADMIN)
 
 QStringList AuthDevice::GetFeatureIDList()
 {
-    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct,deviceType(),deviceSerialNumber());
+    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct, deviceType(), deviceSerialNumber());
     return featureIDs;
 }
 

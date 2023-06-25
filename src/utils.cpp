@@ -109,7 +109,7 @@ QStringList getDriverBlackList()
 
 bool driverEnabled(const QString& driverName)
 {
-    QSettings confSettings(DRIVERS_CONF, QSettings::NativeFormat);
+    QSettings confSettings(DRIVER_CONF, QSettings::NativeFormat);
     QVariant value = confSettings.value(QString("%1/Enable").arg(driverName));
     if (value.isValid())
     {

@@ -14,20 +14,22 @@
 #pragma once
 #include <QSharedPointer>
 #include "ukey-skf.h"
+#include "driver/driver.h"
 
 namespace Kiran
 {
 struct SKFDriverLib;
 
-class UKeySKFDriver : public QObject
+class UKeySKFDriver : public Driver
 {
     Q_OBJECT
 public:
     UKeySKFDriver(QObject *parent = nullptr);
     ~UKeySKFDriver();
 
-    bool isLoaded();
-    bool loadLibrary(QString libPath);
+    bool initDriver(const QString &libPath = QString()) override;
+    bool loadLibrary(const QString &libPath) override;
+    bool isLoaded() override;
     
     QStringList enumDevName();
     QStringList enumDevSerialNumber();

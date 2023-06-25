@@ -28,10 +28,13 @@ configure_file(com.kylinsec.Kiran.AuthDevice.service.in
 install(FILES ${PROJECT_BINARY_DIR}/data/com.kylinsec.Kiran.AuthDevice.service
         DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/dbus-1/system-services)
 
-install(FILES ${PROJECT_SOURCE_DIR}/data/drivers.conf
+install(FILES ${PROJECT_SOURCE_DIR}/data/driver.conf
         DESTINATION ${SYSCONFDIR}/${PROJECT_NAME})
 
-install(FILES ${PROJECT_SOURCE_DIR}/data/third-party-devices.conf
+install(FILES ${PROJECT_SOURCE_DIR}/data/device.conf
+        DESTINATION ${SYSCONFDIR}/${PROJECT_NAME})
+
+install(FILES ${PROJECT_SOURCE_DIR}/data/ukey-manager.conf
         DESTINATION ${SYSCONFDIR}/${PROJECT_NAME})
 
 set(KAD_INSTALL_INCLUDE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})

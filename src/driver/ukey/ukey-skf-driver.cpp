@@ -17,6 +17,7 @@
 #include <QFile>
 #include <QSettings>
 #include "auth-enum.h"
+#include "driver/driver-factory.h"
 
 namespace Kiran
 {
@@ -140,10 +141,13 @@ struct SKFDriverLib
     bool isLoaded = false;
 };
 
-UKeySKFDriver::UKeySKFDriver(QObject *parent) : QObject(parent),
+REGISTER_DRIVER(UKEY_SKF_DRIVER_NAME,UKeySKFDriver);
+
+UKeySKFDriver::UKeySKFDriver(QObject *parent) : Driver(parent),
                                                 m_libHandle(nullptr)
 {
     m_driverLib = QSharedPointer<SKFDriverLib>(new SKFDriverLib);
+    setName(UKEY_SKF_DRIVER_NAME);
 }
 
 UKeySKFDriver::~UKeySKFDriver()
@@ -155,7 +159,12 @@ UKeySKFDriver::~UKeySKFDriver()
     }
 }
 
-bool UKeySKFDriver::loadLibrary(QString libPath)
+bool UKeySKFDriver::initDriver(const QString &libPath)
+{
+    return true;
+}
+
+bool UKeySKFDriver::loadLibrary(const QString &libPath)
 {
     if (!QFile::exists(UKEY_DEFAULT_CONFIG))
     {

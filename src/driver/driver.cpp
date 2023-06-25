@@ -11,18 +11,22 @@
  *
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
-#pragma once
-#include "context/context.h"
+#include "driver.h"
 
 namespace Kiran
 {
-class AuthDevice;
-class FVSDContext : public Context
+Driver::Driver(QObject *parent) : QObject(parent)
 {
-public:
-    explicit FVSDContext(QObject *parent = nullptr);
-    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct) override;
-};
-
-
+}
+Driver::~Driver()
+{
+}
+bool Driver::isLoaded()
+{
+    return false;
+}
+bool Driver::loadLibrary(const QString &libPath)
+{
+    return false;
+}
 }  // namespace Kiran

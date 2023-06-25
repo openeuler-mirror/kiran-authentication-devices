@@ -37,7 +37,6 @@
             <arg name="feature_id" direction="in" type="s">
                 <description>The feature is uniquely identified by feature ID.</description>
             </arg>
-            <description>Remove feature or ukey data according to feature ID</description>
         </method>
         
         <method name="GetDriversByType">

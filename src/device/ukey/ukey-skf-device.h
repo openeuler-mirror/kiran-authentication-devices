@@ -22,15 +22,14 @@
 
 namespace Kiran
 {
-class UKeyFTDevice : public AuthDevice
+class UKeySKFDevice : public AuthDevice
 {
     Q_OBJECT
 public:
-    explicit UKeyFTDevice(QObject *parent = nullptr);
-    ~UKeyFTDevice();
+    explicit UKeySKFDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
+    ~UKeySKFDevice();
 
-    bool initDriver() override;
-
+    bool initDevice() override;
     void resetUkey();
 
 private Q_SLOTS:
@@ -47,18 +46,21 @@ private:
 
     void bindingUKey(DEVHANDLE devHandle, const QString &pin);
     ULONG createContainer(const QString &pin, DEVHANDLE devHandle, HAPPLICATION *appHandle, HCONTAINER *containerHandle);
+
     bool isExistsApplication(DEVHANDLE devHandle, const QString &appName);
     bool isExistBinding();
+
     void notifyUKeyEnrollProcess(EnrollProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
     void notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
 
     QString getPinErrorReson(ULONG error);
 
 private:
-    ULONG m_retryCount = 1000000;
+    ULONG m_retryCount = 10;
     UKeySKFDriver *m_driver = nullptr;
     static QStringList m_existingSerialNumber;
     QTimer m_reInitSerialNumberTimer;
+    QString m_driverLibPath;
 };
 
 }  // namespace Kiran

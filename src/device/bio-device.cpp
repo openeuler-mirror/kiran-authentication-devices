@@ -22,7 +22,7 @@ namespace Kiran
 {
 #define TEMPLATE_MAX_NUMBER 1000
 
-BioDevice::BioDevice(QObject *parent) : AuthDevice{parent},
+BioDevice::BioDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject *parent) : AuthDevice{vid,pid,driver,parent},
                                         m_futureWatcher(nullptr)
 {
     initFutureWatcher();

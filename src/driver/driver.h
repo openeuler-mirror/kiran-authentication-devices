@@ -12,18 +12,27 @@
  * Author:     luoqing <luoqing@kylinsec.com.cn>
  */
 #pragma once
-#include "context/context.h"
-#include "kiran-auth-device-i.h"
+#include <QObject>
+#include <QSharedPointer>
 
 namespace Kiran
 {
-class AuthDevice;
-class MultiFunctionContext : public Context
+class Driver : public QObject
 {
 public:
-    explicit MultiFunctionContext(QObject *parent = nullptr);
-    AuthDevicePtr createDevice(const QString& idVendor, const QString& idProduct) override {return nullptr;};
-    AuthDeviceList createDevices(const QString& idVendor, const QString& idProduct);
-    AuthDevicePtr createIriStarDevice(const QString& idVendor, const QString& idProduct,DeviceType deviceType);
+    Driver(QObject *parent = nullptr);
+    virtual ~Driver();
+
+    QString getName() { return m_driverName; };
+    void setName(const QString &driverName) { m_driverName = driverName; };
+
+    virtual bool initDriver(const QString &libPath = QString()) = 0;
+    virtual bool loadLibrary(const QString &libPath) = 0;
+    virtual bool isLoaded() = 0;
+
+private:
+    QString m_driverName;
 };
+
+typedef QSharedPointer<Driver> DriverPtr;
 }  // namespace Kiran
