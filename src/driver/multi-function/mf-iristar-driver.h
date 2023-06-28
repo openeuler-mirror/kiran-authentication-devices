@@ -17,30 +17,30 @@
 #include <QSharedPointer>
 #include <string>
 #include "auth-enum.h"
+#include "driver/driver.h"
 #include "irsdk1.h"
 #include "irsdk2.h"
 #include "kiran-auth-device-i.h"
+#include <functional>
 
 namespace Kiran
 {
 struct IriStarDriverLib;
 typedef void *Handle;
 
-class MFIriStarDriver : public  QObject
+class MFIriStarDriver : public Driver
 {
     Q_OBJECT
-private:
-    explicit MFIriStarDriver(QObject *parent = nullptr);
 
 public:
-    static MFIriStarDriver *getInstance();
+    explicit MFIriStarDriver(QObject *parent = nullptr);
     ~MFIriStarDriver();
 
     void ref() { ++m_refCount; };
     void unref() { --m_refCount; };
     int refCount() { return m_refCount; };
 
-    bool initDriver();
+    bool initDriver(const QString &libPath = QString()) override;
     bool isInitialized() { return m_isInitialized; };
 
     void doingEnrollStart(DeviceType deviceType);
@@ -49,6 +49,9 @@ public:
     void stop();
     void setDeviceInfo(const QString &idVendor, const QString &idProduct);
 
+    bool loadLibrary(const QString &libPath) override;
+    bool isLoaded() override;
+
 private:
     struct IrisFeatureData
     {
@@ -56,7 +59,6 @@ private:
         QByteArray rightEyeFeature;
     };
 
-    bool loadLib();
     bool initDeviceHandle();
     void reset();
 
@@ -100,7 +102,7 @@ private:
 
     QByteArray m_leftEyeFeatureCache;
     QByteArray m_rightEyeFeatureCache;
-    
+
     QList<QByteArray> m_identifyFeatureCache;
 
     // 当前算法类型

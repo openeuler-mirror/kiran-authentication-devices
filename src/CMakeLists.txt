@@ -24,7 +24,7 @@ qt5_add_dbus_adaptor(
 set(DEVICE_SDK ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}-sdk)
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-set(CMAKE_INSTALL_RPATH ${DEVICE_SDK}/finger-vein/sd:${DEVICE_SDK}/fingerprint/zk:${DEVICE_SDK}/ukey/ft:${DEVICE_SDK}/multi-function/iristar)
+set(CMAKE_INSTALL_RPATH ${DEVICE_SDK}/finger-vein/sd:${DEVICE_SDK}/fingerprint/zk:${DEVICE_SDK}/ukey/skf:${DEVICE_SDK}/multi-function/iristar)
 
 
 set(TS_FILES "${PROJECT_SOURCE_DIR}/translations/${PROJECT_NAME}.zh_CN.ts")
@@ -41,15 +41,14 @@ add_executable(${PROJECT_NAME}
                 ${QM_FILES}
                 )
 
-include_directories(${PROJECT_SOURCE_DIR}/include
-                    )
 
 target_include_directories(${PROJECT_NAME} PUBLIC
                             ${KLOG_QT5_INCLUDE_DIRS}
-                            ${CMAKE_CURRENT_SOURCE_DIR}
                             ${PROJECT_BINARY_DIR}
+                            ${PROJECT_SOURCE_DIR}/src
+                            ${PROJECT_SOURCE_DIR}/include
                             )
-
+                            
 target_link_libraries(${PROJECT_NAME}
                         ${KLOG_QT5_LIBRARIES}
                         ${LIBUDEV_LIBRARIES}
