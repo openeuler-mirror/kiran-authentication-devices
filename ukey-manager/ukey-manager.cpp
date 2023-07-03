@@ -62,7 +62,6 @@ bool UkeyManager::initDriver()
 ULONG UkeyManager::resetUkey()
 {
     ULONG ulReval = m_driver->resetUkey(m_devHandle);
-    m_driver->disConnectDev(m_devHandle);
     return ulReval;
 }
 
