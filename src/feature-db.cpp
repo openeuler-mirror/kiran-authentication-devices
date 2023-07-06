@@ -77,7 +77,7 @@ bool FeatureDB::createDBConnection()
 
         if (!query.exec(createTable))
         {
-            KLOG_DEBUG() << "query.lastError():" << query.lastError();
+            KLOG_DEBUG() << "failed to create table in the database:" << query.lastError();
         }
     }
     return true;

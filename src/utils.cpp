@@ -18,7 +18,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
-
+#include "config.h"
 
 namespace Kiran
 {
@@ -99,33 +99,6 @@ QJsonValue getValueFromJsonString(const QString& json, const QString& key)
     }
     QJsonObject jsonObject = jsonDoc.object();
     return jsonObject.value(key);
-}
-
-QStringList getDriverBlackList()
-{
-    QSettings confSettings(DRIVER_BLACK_LIST_CONF, QSettings::NativeFormat);
-    return confSettings.value(CONF_FILE_DISABLE_DRIVER_NAME).toStringList();
-}
-
-bool driverEnabled(const QString& driverName)
-{
-    QSettings confSettings(DRIVER_CONF, QSettings::NativeFormat);
-    QVariant value = confSettings.value(QString("%1/Enable").arg(driverName));
-    if (value.isValid())
-    {
-        if (value.toString() == "false")
-        {
-            return false;
-        }
-        else if (value.toString() == "true")
-        {
-            return true;
-        }
-        else
-            return false;
-    }
-    else
-        return false;
 }
 
 }  // namespace Utils

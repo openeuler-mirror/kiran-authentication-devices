@@ -233,34 +233,12 @@ int FPZKDevice::enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplat
     return score > 0 ? GENERAL_RESULT_OK : GENERAL_RESULT_FAIL;
 }
 
-QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QStringList featureIDs)
+QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QList<QByteArray> existedfeatures)
 {
-    QList<QByteArray> saveList;
     QString featureID;
-    DeviceInfo info = this->deviceInfo();
-    if (featureIDs.isEmpty())
+    for (int j = 0; j < existedfeatures.count(); j++)
     {
-        saveList = FeatureDB::getInstance()->getFeatures(info.idVendor, info.idProduct, deviceType(), deviceSerialNumber());
-    }
-    else
-    {
-        Q_FOREACH (auto id, featureIDs)
-        {
-            QByteArray feature = FeatureDB::getInstance()->getFeature(id);
-            if (!feature.isEmpty())
-                saveList << feature;
-        }
-    }
-
-    if (saveList.count() == 0)
-    {
-        KLOG_DEBUG() << "no found feature";
-        return QString();
-    }
-
-    for (int j = 0; j < saveList.count(); j++)
-    {
-        auto saveTemplate = saveList.value(j);
+        auto saveTemplate = existedfeatures.value(j);
         int ret = enrollTemplateMatch(fpTemplate, saveTemplate);
         // 指纹已经存在，直接返回该指纹
         if (ret == GENERAL_RESULT_OK)
@@ -294,7 +272,6 @@ void FPZKDevice::enrollTemplateMerge()
     {
         // 三个模板merge失败，判定为录入失败，需要重新录入
         notifyEnrollProcess(ENROLL_PROCESS_MEGER_FAIL);
-        internalStopEnroll();
         return;
     }
 
@@ -318,7 +295,6 @@ void FPZKDevice::enrollTemplateMerge()
         // 如果合成后的指纹与先前录入的指纹不匹配,判定为录入失败，需要重新录入
         notifyEnrollProcess(ENROLL_PROCESS_INCONSISTENT_FEATURE_AFTER_MERGED);
     }
-    internalStopEnroll();
 }
 
 void FPZKDevice::notifyEnrollProcess(EnrollProcess process, const QString& featureID)

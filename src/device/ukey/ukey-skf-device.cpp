@@ -16,27 +16,27 @@
 #include <dlfcn.h>
 #include <qt5-log-i.h>
 #include <QCryptographicHash>
+#include <functional>
 #include "auth-enum.h"
 #include "auth_device_adaptor.h"
+#include "config-helper.h"
+#include "device/device-creator.h"
 #include "feature-db.h"
 #include "utils.h"
-#include "device/device-creator.h"
-#include <functional>
-#include "config-helper.h"
 
 namespace Kiran
 {
-REGISTER_DEVICE(UKEY_SKF_DRIVER_NAME,UKeySKFDevice);
+REGISTER_DEVICE(UKEY_SKF_DRIVER_NAME, UKeySKFDevice);
 
 QStringList UKeySKFDevice::m_existingSerialNumber;
 
 UKeySKFDevice::UKeySKFDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent) : AuthDevice{vid, pid, driver, parent}
 {
-    //NOTE:并未使用传递进来的DriverPtr
+    // NOTE:并未使用传递进来的DriverPtr
     setDeviceType(DEVICE_TYPE_UKey);
-    setDriverName(ConfigHelper::getDriverName(vid,pid));
-    m_driverLibPath = ConfigHelper::getLibPath(vid,pid);
-    
+    setDriverName(ConfigHelper::getDriverName(vid, pid));
+    m_driverLibPath = ConfigHelper::getLibPath(vid, pid);
+
     /**
      * NOTE:
      * UKey设备插入时，设备可能处在未准备好的状态，无法获取到serialNumber
@@ -167,7 +167,7 @@ void UKeySKFDevice::bindingUKey(DEVHANDLE devHandle, const QString &pin)
      * 不用保存PublicKey和systemUser的关系,目前只有一个用户
      */
     QByteArray keyFeature;
-    keyFeature.append((char *)&publicKey,sizeof(publicKey));
+    keyFeature.append((char *)&publicKey, sizeof(publicKey));
     KLOG_DEBUG() << "keyFeature:" << keyFeature;
 
     QString featureID = QCryptographicHash::hash(keyFeature, QCryptographicHash::Md5).toHex();
@@ -248,30 +248,7 @@ void UKeySKFDevice::doingIdentifyStart(const QString &value)
     {
         QString message = tr("The pin code cannot be empty!");
         Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_NOT_MATCH, message);
-        KLOG_ERROR() << message;
-        internalStopIdentify();
-        return;
-    }
-
-    QList<QByteArray> saveList;
-    DeviceInfo deviceInfo = this->deviceInfo();
-    if (m_identifyIDs.isEmpty())
-    {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType(), deviceSerialNumber());
-    }
-    else
-    {
-        Q_FOREACH (auto id, m_identifyIDs)
-        {
-            QByteArray feature = FeatureDB::getInstance()->getFeature(id);
-            saveList << feature;
-        }
-    }
-
-    if (saveList.count() == 0)
-    {
-        KLOG_DEBUG() << "no found feature id";
-        notifyUKeyIdentifyProcess(IDENTIFY_PROCESS_NO_MATCH);
+        KLOG_ERROR() << "The pin code cannot be empty!";
         internalStopIdentify();
         return;
     }
@@ -284,7 +261,8 @@ void UKeySKFDevice::doingIdentifyStart(const QString &value)
         internalStopIdentify();
         return;
     }
-
+    
+    QList<QByteArray> saveList = getFeaturesThatNeedToIdentify();
     for (int j = 0; j < saveList.count(); j++)
     {
         auto savedKey = saveList.value(j);
@@ -294,35 +272,22 @@ void UKeySKFDevice::doingIdentifyStart(const QString &value)
     internalStopIdentify();
 }
 
-void UKeySKFDevice::internalStopEnroll()
+void UKeySKFDevice::deviceStopEnroll()
 {
-    if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
+    if (m_driver)
     {
-        setDeviceStatus(DEVICE_STATUS_IDLE);
-        clearWatchedServices();
-        if (m_driver)
-        {
-            KLOG_DEBUG() << "delete driver";
-            delete m_driver;
-            m_driver = nullptr;
-        }
-        KLOG_DEBUG() << "stop Enroll";
+        KLOG_DEBUG() << "delete driver";
+        delete m_driver;
+        m_driver = nullptr;
     }
 }
 
-void UKeySKFDevice::internalStopIdentify()
+void UKeySKFDevice::deviceStopIdentify()
 {
-    if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
+    if (m_driver)
     {
-        m_identifyIDs.clear();
-        setDeviceStatus(DEVICE_STATUS_IDLE);
-        clearWatchedServices();
-        if (m_driver)
-        {
-            delete m_driver;
-            m_driver = nullptr;
-        }
-        KLOG_DEBUG() << "stopIdentify";
+        delete m_driver;
+        m_driver = nullptr;
     }
 }
 

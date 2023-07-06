@@ -20,6 +20,7 @@
 #include <QDBusMessage>
 #include "auth_device_manager_adaptor.h"
 #include "config-helper.h"
+#include "config.h"
 #include "device/auth-device.h"
 #include "device/device-creator.h"
 #include "device/ukey/ukey-skf-device.h"
@@ -31,6 +32,9 @@
 
 namespace Kiran
 {
+
+#define MAX_RETREY_CREATE_COUNT 2
+
 AuthDeviceManager::AuthDeviceManager(QObject* parent) : QObject(parent)
 {
 }
@@ -180,15 +184,24 @@ void AuthDeviceManager::onRemove(const QDBusMessage& message, const QString& fea
 void AuthDeviceManager::onSetEnableDriver(const QDBusMessage& message, const QString& driver_name, bool enable)
 {
     QStringList driverList = ConfigHelper::getDriverList();
-    if (!driverList.contains(driver_name))
-    {
-        goto end;
-    }
-    ConfigHelper::setDriverEnabled(driver_name, enable);
+    QDBusMessage replyMessage;
 
-    // 驱动被禁用，将当前正在使用的设备释放掉
-    if (!enable)
+    do
     {
+        if (!driverList.contains(driver_name))
+        {
+            replyMessage = message.createErrorReply(QDBusError::Failed, "No driver with the corresponding name was found.");
+            break;
+        }
+        ConfigHelper::setDriverEnabled(driver_name, enable);
+        replyMessage = message.createReply();
+
+        if (enable)
+        {
+            break;
+        }
+
+        // 驱动被禁用，将当前正在使用的设备释放掉
         auto devices = m_deviceMap.values();
         Q_FOREACH (AuthDevicePtr device, devices)
         {
@@ -204,10 +217,45 @@ void AuthDeviceManager::onSetEnableDriver(const QDBusMessage& message, const QSt
             Q_EMIT m_dbusAdaptor->DeviceDeleted(deviceType, deviceID);
             KLOG_INFO() << QString("destroyed deviceType: %1, deviceID:%2").arg(deviceType).arg(deviceID);
         }
-    }
-end:
-    auto replyMessage = message.createReply();
+    } while (false);
+
     QDBusConnection::systemBus().send(replyMessage);
+}
+
+AuthDeviceList AuthDeviceManager::createDevices(const DeviceInfo& deviceInfo)
+{
+    // TODO:先从内置默认支持的设备开始搜索，最后才搜索第三方设备
+    QString vid = deviceInfo.idVendor;
+    QString pid = deviceInfo.idProduct;
+    if (!ConfigHelper::isDeviceSupported(vid, pid))
+    {
+        KLOG_DEBUG() << "no auth device!"
+                     << "idVendor:" << vid
+                     << "idProduct:" << pid;
+        return AuthDeviceList();
+    }
+
+    DeviceConf deviceConf = ConfigHelper::getDeviceConf(vid, pid);
+    if (!ConfigHelper::driverEnabled(vid, pid))
+    {
+        KLOG_INFO() << QString("driver:%1 is disabled, auth device: %2 can't be used")
+                           .arg(deviceConf.driver)
+                           .arg(deviceConf.deviceName)
+                    << " vid:" << vid << " pid:" << pid;
+        return AuthDeviceList();
+    }
+
+    QString libPath = ConfigHelper::getLibPath(vid, pid);
+    DriverPtr driverPtr = DriverFactory::getInstance()->getDriver(deviceConf.driver, libPath);
+
+    if (driverPtr.isNull())
+    {
+        KLOG_ERROR() << QString("get driver: %1 failed!").arg(deviceConf.driver);
+        return AuthDeviceList();
+    }
+
+    AuthDeviceList deviceList = DeviceCereator::getInstance()->createDevices(vid, pid, driverPtr);
+    return deviceList;
 }
 
 CHECK_AUTH_WITH_1ARGS(AuthDeviceManager, Remove, onRemove, AUTH_USER_ADMIN, const QString&)
@@ -216,7 +264,8 @@ CHECK_AUTH_WITH_2ARGS(AuthDeviceManager, SetEnableDriver, onSetEnableDriver, AUT
 void AuthDeviceManager::init()
 {
     m_dbusAdaptor = QSharedPointer<AuthDeviceManagerAdaptor>(new AuthDeviceManagerAdaptor(this));
-    connect(&m_timer, &QTimer::timeout, this, &AuthDeviceManager::handleDeviceReCreate);
+    m_ReCreateTimer.setInterval(1000);
+    connect(&m_ReCreateTimer, &QTimer::timeout, this, &AuthDeviceManager::handleDeviceReCreate);
 
     QDBusConnection dbusConnection = QDBusConnection::systemBus();
     if (!dbusConnection.registerService(AUTH_DEVICE_DBUS_NAME))
@@ -249,37 +298,7 @@ void AuthDeviceManager::init()
 
 void AuthDeviceManager::handleDeviceAdded(const DeviceInfo& deviceInfo)
 {
-    // TODO:先从内置默认支持的设备开始搜索，最后才搜索第三方设备
-    QString vid = deviceInfo.idVendor;
-    QString pid = deviceInfo.idProduct;
-    if (!ConfigHelper::isDeviceSupported(vid, pid))
-    {
-        KLOG_DEBUG() << "no auth device!"
-                     << "idVendor:" << vid
-                     << "idProduct:" << pid;
-        return;
-    }
-
-    DeviceConf deviceConf = ConfigHelper::getDeviceConf(vid, pid);
-    if (!ConfigHelper::driverEnabled(vid, pid))
-    {
-        KLOG_INFO() << QString("driver:%1 is disabled, auth device: %2 can't be used")
-                           .arg(deviceConf.driver)
-                           .arg(deviceConf.deviceName)
-                    << " vid:" << vid << " pid:" << pid;
-        return;
-    }
-
-    QString libPath = ConfigHelper::getLibPath(vid, pid);
-    DriverPtr driverPtr = DriverFactory::getInstance()->getDriver(deviceConf.driver, libPath);
-
-    if (driverPtr.isNull())
-    {
-        KLOG_ERROR() << QString("get driver: %1 failed!").arg(deviceConf.driver);
-        return;
-    }
-
-    AuthDeviceList deviceList = DeviceCereator::getInstance()->getDevices(vid, pid, driverPtr);
+    AuthDeviceList deviceList = createDevices(deviceInfo);
     if (deviceList.count() == 0)
     {
         handleDeviceCreateFail(deviceInfo);
@@ -289,7 +308,6 @@ void AuthDeviceManager::handleDeviceAdded(const DeviceInfo& deviceInfo)
     Q_FOREACH (auto device, deviceList)
     {
         m_deviceMap.insert(deviceInfo.busPath, device);
-        Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
         Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
 
         KLOG_DEBUG() << "auth device added"
@@ -304,9 +322,9 @@ void AuthDeviceManager::handleDeviceCreateFail(DeviceInfo deviceInfo)
     m_retreyCreateDeviceMap.insert(deviceInfo, 0);
     if (m_retreyCreateDeviceMap.count() != 0)
     {
-        if (!m_timer.isActive())
+        if (!m_ReCreateTimer.isActive())
         {
-            m_timer.start(1000);
+            m_ReCreateTimer.start();
         }
     }
 }
@@ -334,7 +352,7 @@ void AuthDeviceManager::handleDeviceDeleted()
         deviceID = oldAuthDevice->deviceID();
         deviceType = oldAuthDevice->deviceType();
         int removeCount = m_deviceMap.remove(busPath);
-        oldAuthDevice.clear();
+
         Q_EMIT m_dbusAdaptor->DeviceDeleted(deviceType, deviceID);
 
         QMapIterator<DeviceInfo, int> i(m_retreyCreateDeviceMap);
@@ -355,7 +373,7 @@ void AuthDeviceManager::handleDeviceReCreate()
 {
     if (m_retreyCreateDeviceMap.count() == 0)
     {
-        m_timer.stop();
+        m_ReCreateTimer.stop();
         return;
     }
 
@@ -363,28 +381,15 @@ void AuthDeviceManager::handleDeviceReCreate()
     while (i.hasNext())
     {
         i.next();
-        if (i.value() >= 2)
+        if (i.value() >= MAX_RETREY_CREATE_COUNT)
         {
             m_retreyCreateDeviceMap.remove(i.key());
             continue;
         }
 
         auto deviceInfo = i.key();
-        QString vid = deviceInfo.idVendor;
-        QString pid = deviceInfo.idProduct;
 
-        DeviceConf deviceConf = ConfigHelper::getDeviceConf(vid, pid);
-        DriverPtr driverPtr = DriverFactory::getInstance()->getDriver(deviceConf.driver);
-        if (!driverPtr.isNull())
-        {
-            if (!driverPtr->initDriver())
-            {
-                KLOG_ERROR() << QString("init driver %1 failed").arg(deviceConf.driver);
-                continue;
-            }
-        }
-
-        AuthDeviceList deviceList = DeviceCereator::getInstance()->getDevices(vid, pid, driverPtr);
+        AuthDeviceList deviceList = createDevices(deviceInfo);
         if (deviceList.count() == 0)
         {
             m_retreyCreateDeviceMap.insert(i.key(), i.value() + 1);
@@ -394,7 +399,6 @@ void AuthDeviceManager::handleDeviceReCreate()
         Q_FOREACH (auto device, deviceList)
         {
             m_deviceMap.insert(deviceInfo.busPath, device);
-            Q_EMIT this->DeviceAdded(device->deviceType(), device->deviceID());
             Q_EMIT m_dbusAdaptor->DeviceAdded(device->deviceType(), device->deviceID());
 
             KLOG_DEBUG() << "device added"

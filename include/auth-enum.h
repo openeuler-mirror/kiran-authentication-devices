@@ -19,11 +19,6 @@ namespace Kiran
 {
 #define DATABASE_DIR "/usr/share/kiran-authentication-devices"
 
-#define DRIVER_BLACK_LIST_CONF "/etc/kiran-authentication-device/driver-blacklist.conf"
-#define DEVICE_CONF "/etc/kiran-authentication-devices/device.conf"
-#define DRIVER_CONF "/etc/kiran-authentication-devices/driver.conf"
-#define UKEY_MANAGER_CONF "/etc/kiran-authentication-devices/ukey-manager.conf"
-
 #define AUTH_USER_ADMIN "com.kylinsec.kiran.authentication.user-administration"
 
 #define FT_UKEY_DRIVER_LIB "libes_3000gm.so"

@@ -16,6 +16,7 @@
 #include <qt5-log-i.h>
 #include <QSettings>
 #include "auth-enum.h"
+#include "config.h"
 
 namespace Kiran
 {
@@ -27,23 +28,44 @@ DeviceConf ConfigHelper::getDeviceConf(const QString &vid, const QString &pid)
     Q_FOREACH (auto deviceConf, deviceConfList)
     {
         confSettings.beginGroup(deviceConf);
-        if ((confSettings.value("Vid").toString() == vid) &&
-            (confSettings.value("Pid").toString() == pid))
-        {
-            DeviceConf conf;
-            conf.deviceName = confSettings.value("Name").toString();
-            conf.type = confSettings.value("Type").toInt();
-            conf.vid = confSettings.value("Vid").toString();
-            conf.pid = confSettings.value("Pid").toString();
-            conf.driver = confSettings.value("Driver").toString();
-            conf.libPath = confSettings.value("LibPath").toString();
 
-            return conf;
+        QStringList idList = confSettings.value("Id").toStringList();
+        for (const QString &id : idList)
+        {
+            if (id == QString("%1:%2").arg(vid).arg(pid))
+            {
+                DeviceConf conf;
+                conf.deviceName = confSettings.value("Name").toString();
+                conf.type = confSettings.value("Type").toInt();
+                conf.vid = vid;
+                conf.pid = pid;
+                conf.driver = confSettings.value("Driver").toString();
+                return conf;
+            }
         }
+
         confSettings.endGroup();
     }
 
     return DeviceConf();
+}
+
+DriverConf ConfigHelper::getDriverConf(const QString &vid, const QString &pid)
+{
+    QString driverName = getDeviceConf(vid, pid).driver;
+
+    DriverConf driverConf;
+    QSettings confSettings(DRIVER_CONF, QSettings::NativeFormat);
+    confSettings.beginGroup(driverName);
+
+    driverConf.driverName = driverName;
+    driverConf.enable = confSettings.value("Enable").toBool();
+    driverConf.type = confSettings.value("Type").toInt();
+    driverConf.libPath = confSettings.value("LibPath").toString();
+
+    confSettings.endGroup();
+
+    return driverConf;
 }
 
 QString ConfigHelper::getDriverName(const QString &vid, const QString &pid)
@@ -60,8 +82,8 @@ QString ConfigHelper::getDeviceName(const QString &vid, const QString &pid)
 
 QString ConfigHelper::getLibPath(const QString &vid, const QString &pid)
 {
-    DeviceConf conf = getDeviceConf(vid, pid);
-    return conf.libPath;
+    DriverConf driverConf = getDriverConf(vid, pid);
+    return driverConf.libPath;
 }
 
 int ConfigHelper::getDeviceType(const QString &vid, const QString &pid)
@@ -91,16 +113,14 @@ bool ConfigHelper::driverEnabled(const QString &vid, const QString &pid)
     return enable;
 }
 
-void ConfigHelper::setDriverEnabled(const QString& driverName, bool enable)
+void ConfigHelper::setDriverEnabled(const QString &driverName, bool enable)
 {
     QSettings confSettings(DRIVER_CONF, QSettings::NativeFormat);
     QStringList driverList = confSettings.childGroups();
-    QString enableStr;
     if (driverList.contains(driverName))
     {
-        enableStr = enable ? QString("true") : QString("false");
-        confSettings.setValue(QString("%1/Enable").arg(driverName), QVariant(enableStr));
-        KLOG_INFO()  <<  QString("driver: %1 %2").arg(driverName).arg((enable == true) ? "enable":"disable");
+        confSettings.setValue(QString("%1/Enable").arg(driverName), QVariant(enable));
+        KLOG_INFO() << QString("driver: %1 %2").arg(driverName).arg(enable ? "enable" : "disable");
     }
 }
 
@@ -112,11 +132,16 @@ bool ConfigHelper::isDeviceSupported(const QString &vid, const QString &pid)
     Q_FOREACH (auto deviceConf, deviceConfList)
     {
         confSettings.beginGroup(deviceConf);
-        if ((confSettings.value("Vid").toString() == vid) &&
-            (confSettings.value("Pid").toString() == pid))
+
+        QStringList idList = confSettings.value("Id").toStringList();
+        for (const QString &id : idList)
         {
-            return true;
+            if (id == QString("%1:%2").arg(vid).arg(pid))
+            {
+                return true;
+            }
         }
+
         confSettings.endGroup();
     }
     return false;

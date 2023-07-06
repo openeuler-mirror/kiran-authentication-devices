@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.2)
 
-set(SYSCONFDIR "/etc")
 # init variables
 if(SYSTEMD_FOUND)
   pkg_get_variable(SYSTEM_UNIT_DIR systemd systemdsystemunitdir)
@@ -29,15 +28,16 @@ install(FILES ${PROJECT_BINARY_DIR}/data/com.kylinsec.Kiran.AuthDevice.service
         DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/dbus-1/system-services)
 
 install(FILES ${PROJECT_SOURCE_DIR}/data/driver.conf
-        DESTINATION ${SYSCONFDIR}/${PROJECT_NAME})
+        DESTINATION ${CONF_INSTALL_DIR})
 
 install(FILES ${PROJECT_SOURCE_DIR}/data/device.conf
-        DESTINATION ${SYSCONFDIR}/${PROJECT_NAME})
+        DESTINATION ${CONF_INSTALL_DIR})
 
 install(FILES ${PROJECT_SOURCE_DIR}/data/ukey-manager.conf
-        DESTINATION ${SYSCONFDIR}/${PROJECT_NAME})
+        DESTINATION ${CONF_INSTALL_DIR})
 
-set(KAD_INSTALL_INCLUDE ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}/${PROJECT_NAME})
+set(DRIVER_CONF_PATH ${CONF_INSTALL_DIR}/driver.conf)
+set(DEVICE_CONF_PATH ${CONF_INSTALL_DIR}/device.conf)
+set(UKEY_MANAGER_CONF_PATH ${CONF_INSTALL_DIR}/ukey-manager.conf)
 
-install(FILES ${PROJECT_SOURCE_DIR}/include/kiran-auth-device-i.h
-        DESTINATION ${KAD_INSTALL_INCLUDE}/)
+configure_file(${CMAKE_SOURCE_DIR}/data/config.h.in ${CMAKE_BINARY_DIR}/config.h)

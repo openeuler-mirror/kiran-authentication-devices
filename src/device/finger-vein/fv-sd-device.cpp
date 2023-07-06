@@ -240,42 +240,21 @@ void FVSDDevice::enrollTemplateMerge()
         KLOG_DEBUG() << "Finger vein template fusion failed:" << ret;
         notifyEnrollProcess(ENROLL_PROCESS_MEGER_FAIL);
     }
-    internalStopEnroll();
 }
 
 QString FVSDDevice::isFeatureEnrolled(QByteArray fpTemplate)
 {
     QByteArray featureForVerify = getFeatureFromImage(fpTemplate, EXTRACT_FEATURE_VERIFY);
-    QString featureID = identifyFeature(featureForVerify, QStringList());
+    QList<QByteArray> features = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(), deviceSerialNumber());
+    QString featureID = identifyFeature(featureForVerify, features);
     return featureID;
 }
 
-QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
+QString FVSDDevice::identifyFeature(QByteArray feature, QList<QByteArray> existedfeatures)
 {
-    QList<QByteArray> saveList;
     QString featureID;
-    DeviceInfo deviceInfo = this->deviceInfo();
-    if (featureIDs.isEmpty())
-    {
-        saveList = FeatureDB::getInstance()->getFeatures(deviceInfo.idVendor, deviceInfo.idProduct, deviceType(), deviceSerialNumber());
-    }
-    else
-    {
-        Q_FOREACH (auto id, featureIDs)
-        {
-            QByteArray feature = FeatureDB::getInstance()->getFeature(id);
-            if (!feature.isEmpty())
-                saveList << feature;
-        }
-    }
-
-    if (saveList.count() == 0)
-    {
-        return QString();
-    }
-
     QByteArray saveTempl;
-    Q_FOREACH (auto saveFeature, saveList)
+    Q_FOREACH (auto saveFeature, existedfeatures)
     {
         saveTempl.append(saveFeature);
     }
@@ -283,11 +262,10 @@ QString FVSDDevice::identifyFeature(QByteArray feature, QStringList featureIDs)
     int matchIndex = 0;
     int matchScore = 0;
     unsigned char updateTmpl[TEMPLATE_SIZE] = {0};  // 自我学习后的新模板
-    KLOG_DEBUG() << "saveList.count():" << saveList.count();
 
     int matchResult = m_driver->TGFeatureMatchTmpl1N((unsigned char *)feature.data(),
                                                      (unsigned char *)saveTempl.data(),
-                                                     saveList.count(),
+                                                     existedfeatures.count(),
                                                      &matchIndex,
                                                      &matchScore,
                                                      updateTmpl);

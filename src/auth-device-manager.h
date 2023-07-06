@@ -29,7 +29,6 @@ class AuthDeviceManagerAdaptor;
 namespace Kiran
 {
 class AuthDevice;
-class ContextFactory;
 
 class AuthDeviceManager : public QObject, protected QDBusContext
 {
@@ -53,7 +52,7 @@ public Q_SLOTS:
     void Remove(const QString &feature_id);
 
 private Q_SLOTS:
-    void handleDeviceAdded(const DeviceInfo &usbInfo);
+    void handleDeviceAdded(const DeviceInfo &deviceInfo);
     void handleDeviceDeleted();
     void handleDeviceReCreate();
     void handleDeviceCreateFail(DeviceInfo deviceInfo);
@@ -62,10 +61,7 @@ private:
     void init();
     void onRemove(const QDBusMessage &message, const QString &feature_id);
     void onSetEnableDriver(const QDBusMessage &message, const QString &driver_name, bool enable);
-
-Q_SIGNALS:
-    void DeviceAdded(int device_type, const QString &device_id);
-    void DeviceDeleted(int device_type, const QString &device_id);
+    QList<QSharedPointer<AuthDevice>> createDevices(const DeviceInfo &deviceInfo);
 
 private:
     static AuthDeviceManager *m_instance;
@@ -73,7 +69,7 @@ private:
     QSharedPointer<AuthDeviceManagerAdaptor> m_dbusAdaptor;
     // 总线 -- AuthDevice对象对应
     QMultiMap<QString, QSharedPointer<AuthDevice>> m_deviceMap;
-    QTimer m_timer;
+    QTimer m_ReCreateTimer;
 
     // 设备信息-重试次数
     QMap<DeviceInfo, int> m_retreyCreateDeviceMap;

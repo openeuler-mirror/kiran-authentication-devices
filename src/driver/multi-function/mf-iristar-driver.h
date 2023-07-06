@@ -43,8 +43,8 @@ public:
     bool initDriver(const QString &libPath = QString()) override;
     bool isInitialized() { return m_isInitialized; };
 
-    void doingEnrollStart(DeviceType deviceType);
-    void doingIdentifyStart(DeviceType deviceType, QStringList featureIDs);
+    void doingEnrollStart(DeviceType deviceType, QList<QByteArray> existedfeatures);
+    void doingIdentifyStart(DeviceType deviceType, QList<QByteArray> features);
 
     void stop();
     void setDeviceInfo(const QString &idVendor, const QString &idProduct);
@@ -76,9 +76,7 @@ private:
     void handleRecognized(IRS_Results *results);
     void handleRecognizingFailed(IRS_Results *results);
 
-    int prepareEnroll(const char *object);
-
-    int startIdentify(QStringList featureIDs);
+    int startIdentify(QList<QByteArray> features);
     int identifyIris(QList<QByteArray> features);
     int identifyFace(QList<QByteArray> features);
 

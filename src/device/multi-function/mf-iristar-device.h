@@ -26,13 +26,12 @@ public:
     explicit MFIriStarDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
     ~MFIriStarDevice();
 
-    bool initDevice() override;
-
 private:
+    bool initDevice() override;
     void doingEnrollStart(const QString &extraInfo) override;
     void doingIdentifyStart(const QString &value) override;
-    void internalStopEnroll() override;
-    void internalStopIdentify() override;
+    void deviceStopEnroll() override;
+    void deviceStopIdentify() override;
 
     void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString());
     void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString());

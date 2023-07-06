@@ -28,8 +28,5 @@ QString getDeviceName(const QString& idVendor, const QString& idProduct);
 
 QJsonValue getValueFromJsonString(const QString& json, const QString& key);
 
-QStringList getDriverBlackList();
-
-bool driverEnabled(const QString& driverName);
 }  // namespace Utils
 }  // namespace Kiran

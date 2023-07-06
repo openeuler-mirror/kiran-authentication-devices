@@ -29,18 +29,18 @@ public:
     explicit UKeySKFDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
     ~UKeySKFDevice();
 
-    bool initDevice() override;
     void resetUkey();
 
 private Q_SLOTS:
     bool initSerialNumber();
 
 private:
+    bool initDevice() override;
     void doingEnrollStart(const QString &extraInfo) override;
     void doingIdentifyStart(const QString &value) override;
 
-    void internalStopEnroll() override;
-    void internalStopIdentify() override;
+    void deviceStopEnroll() override;
+    void deviceStopIdentify() override;
 
     void identifyKeyFeature(const QString &pin, QByteArray keyFeature);
 

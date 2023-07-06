@@ -45,7 +45,7 @@ DeviceCereator::~DeviceCereator()
 {
 }
 
-AuthDeviceList DeviceCereator::getDevices(const QString &vid, const QString &pid, DriverPtr driver)
+AuthDeviceList DeviceCereator::createDevices(const QString &vid, const QString &pid, DriverPtr driver)
 {
     AuthDeviceList deviceList;
     QStringList driverNameList = m_deviceFuncMap.keys();
@@ -72,12 +72,7 @@ AuthDeviceList DeviceCereator::getDevices(const QString &vid, const QString &pid
             (irisDevicePtr->init()))
         {
             deviceList << faceDevicePtr << irisDevicePtr;
-        }
-        else
-        {
-            KLOG_ERROR() << QString("device %1:%2 init failed!").arg(vid).arg(pid);
-            faceDevicePtr.clear();
-            irisDevicePtr.clear();
+            return deviceList;
         }
     }
     else
@@ -87,14 +82,12 @@ AuthDeviceList DeviceCereator::getDevices(const QString &vid, const QString &pid
         if (devicePtr->init())
         {
             deviceList << devicePtr;
-        }
-        else
-        {
-            KLOG_ERROR() << QString("device %1:%2 init failed!").arg(vid).arg(pid);
-            devicePtr.clear();
+            return deviceList;
         }
     }
-    return deviceList;
+    
+    KLOG_ERROR() << QString("device %1:%2 init failed!").arg(vid).arg(pid);
+    return AuthDeviceList();
 }
 
 void DeviceCereator::registerDevice(QString driverName, std::function<AuthDevice *(const QString &vid, const QString &pid, DriverPtr driver)> func)

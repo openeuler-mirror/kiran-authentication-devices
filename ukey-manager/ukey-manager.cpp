@@ -4,6 +4,7 @@
 #include "ukey-skf-driver.h"
 #include  <QSettings>
 #include "auth-enum.h"
+#include "config.h"
 
 #define DEFAULT_USER_PINCODE "12345678"
 
