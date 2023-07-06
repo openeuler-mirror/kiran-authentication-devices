@@ -264,11 +264,13 @@ void MFIriStarDriver::reset()
 }
 
 /**
+ * 开启注册流程，用于获取人脸/虹膜注册特征信息和图像，非阻塞调用。结果数据通过结果回调函数irsResultCallback返回
+ * 采集数据的特征类型，只支持I/F，其中I表示虹膜，F表示人脸
  * 注册模式：F-人脸 I-双眼 l-单左眼 r-单右眼
  * 识别模式：F-人脸 I-双眼
  * 识别虹膜时不区分单双眼，只传双眼即可；只有W200设备支持注册时选择单双眼，其他设备全部是双眼
  */
-void MFIriStarDriver::doingEnrollStart(DeviceType deviceType)
+void MFIriStarDriver::doingEnrollStart(DeviceType deviceType, QList<QByteArray> existedfeatures)
 {
     if (deviceType == DEVICE_TYPE_Iris)
     {
@@ -283,12 +285,22 @@ void MFIriStarDriver::doingEnrollStart(DeviceType deviceType)
     setVideoStream(m_algorithmType.c_str());
     setDeviceStatus(DEVICE_STATUS_DOING_ENROLL);
 
-    // 开启注册流程，用于获取人脸/虹膜注册特征信息和图像，非阻塞调用。结果数据通过结果回调函数irsResultCallback返回
-    // 采集数据的特征类型，只支持I/F，其中I表示虹膜，F表示人脸
-    int retVal = prepareEnroll(m_algorithmType.c_str());
+    // 已经存在的特征为空，说明未录入过
+    if (existedfeatures.count() == 0)
+    {
+        Q_EMIT addFeature();
+        return;
+    }
+    // 注册前需要开启识别流程判断之前是否注册过
+    int retVal = startIdentify(existedfeatures);
+    if (retVal == -1)
+    {
+        Q_EMIT addFeature();
+        return;
+    }
 }
 
-void MFIriStarDriver::doingIdentifyStart(DeviceType deviceType, QStringList featureIDs)
+void MFIriStarDriver::doingIdentifyStart(DeviceType deviceType, QList<QByteArray> features)
 {
     if (deviceType == DEVICE_TYPE_Iris)
     {
@@ -303,7 +315,7 @@ void MFIriStarDriver::doingIdentifyStart(DeviceType deviceType, QStringList feat
     setVideoStream(m_algorithmType.c_str());
     setDeviceStatus(DEVICE_STATUS_DOING_IDENTIFY);
 
-    int retVal = startIdentify(featureIDs);
+    int retVal = startIdentify(features);
 
     if (retVal != GENERAL_RESULT_OK)
     {
@@ -346,56 +358,18 @@ bool MFIriStarDriver::isLoaded()
     return m_driverLib->isLoaded;
 }
 
-int MFIriStarDriver::prepareEnroll(const char *objectType)
+int MFIriStarDriver::startIdentify(QList<QByteArray> features)
 {
-    KLOG_DEBUG() << "prepareEnroll";
-    // 注册前需要开启识别流程判断之前是否注册过
-    int retVal = startIdentify(QStringList());
-    if (retVal == -1)
-    {
-        KLOG_DEBUG() << "add Feature";
-        Q_EMIT addFeature();
-    }
-    return retVal;
-}
-
-int MFIriStarDriver::startIdentify(QStringList featureIDs)
-{
-    KLOG_DEBUG() << "startIdentify";
-    // TODO:这段代码有多处使用，可以提炼复用
-    QList<QByteArray> saveList;
-    QString featureID;
-
-    if (featureIDs.isEmpty())
-    {
-        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct, (DeviceType)m_currentDeviceType, QString());
-    }
-    else
-    {
-        Q_FOREACH (auto id, featureIDs)
-        {
-            QByteArray feature = FeatureDB::getInstance()->getFeature(id);
-            if (!feature.isEmpty())
-                saveList << feature;
-        }
-    }
-
-    if (saveList.count() == 0)
-    {
-        KLOG_DEBUG() << " no features in the database";
-        return -1;
-    }
-
     int retVal = 0;
-    m_identifyFeatureCache = saveList;
+    m_identifyFeatureCache = features;
     // 识别类型，只支持I/F，其中I表示虹膜，F表示人脸
     if (m_algorithmType == ALGORITHM_TYPE_IRIS)
     {
-        retVal = identifyIris(saveList);
+        retVal = identifyIris(features);
     }
     else if (m_algorithmType == ALGORITHM_TYPE_FACE)
     {
-        retVal = identifyFace(saveList);
+        retVal = identifyFace(features);
     }
 
     return retVal;
@@ -480,7 +454,6 @@ void MFIriStarDriver::onStartEnroll()
     }
 
     retVal = m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_START_ENROLL, (void *)m_algorithmType.c_str(), strlen(m_algorithmType.c_str()));
-    KLOG_DEBUG() << "IRS_CONTROL_START_ENROLL:" << retVal;
     if (retVal != GENERAL_RESULT_OK)
     {
         KLOG_ERROR() << "start enroll failed:" << retVal;

@@ -36,7 +36,7 @@ public:
     static DeviceCereator *getInstance();
     ~DeviceCereator();
 
-    AuthDeviceList getDevices(const QString &vid, const QString &pid, DriverPtr driver);
+    AuthDeviceList createDevices(const QString &vid, const QString &pid, DriverPtr driver);
 
     void registerDevice(QString driverName,
                         std::function<AuthDevice *(const QString &vid, const QString &pid, DriverPtr driver)> func);

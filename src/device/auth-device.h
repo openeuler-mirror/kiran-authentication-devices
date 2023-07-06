@@ -23,13 +23,13 @@
 #include "auth-enum.h"
 #include "driver/driver.h"
 #include "kiran-auth-device-i.h"
+#include "device-creator.h"
 
 class AuthDeviceAdaptor;
 
 namespace Kiran
 {
 typedef void *Handle;
-class BDriver;
 
 class AuthDevice : public QObject, protected QDBusContext
 {
@@ -43,10 +43,8 @@ public:
     explicit AuthDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
     virtual ~AuthDevice();
     bool init();
-    virtual bool initDevice() = 0;
 
     QDBusObjectPath getObjectPath() { return m_objectPath; };
-    void setDeviceType(DeviceType deviceType) { m_deviceType = deviceType; };
     
     DeviceType deviceType() { return m_deviceType; };
     DeviceStatus deviceStatus() { return m_deviceStatus; };
@@ -57,6 +55,10 @@ public:
 
     QString driverName() { return m_driverName; };
 
+private:
+    virtual bool initDevice() = 0;
+    friend AuthDeviceList DeviceCereator::createDevices(const QString &vid, const QString &pid, DriverPtr driver);
+
 public Q_SLOTS:
     virtual void EnrollStart(const QString &extraInfo);
     virtual void EnrollStop();
@@ -65,6 +67,7 @@ public Q_SLOTS:
     virtual QStringList GetFeatureIDList();
 
 protected:
+    void setDeviceType(DeviceType deviceType) { m_deviceType = deviceType; };
     void setDeviceStatus(DeviceStatus deviceStatus) { m_deviceStatus = deviceStatus; };
     void setDeviceName(const QString &deviceName) { m_deviceName = deviceName; };
     void setDeviceInfo(const QString &idVendor, const QString &idProduct);
@@ -73,8 +76,13 @@ protected:
     void setDriverName(const QString &driverName) { m_driverName = driverName; };
 
     void clearWatchedServices();
-    virtual void internalStopEnroll() = 0;
-    virtual void internalStopIdentify() = 0;
+    void internalStopEnroll();
+    void internalStopIdentify();
+
+    virtual void deviceStopEnroll() = 0;
+    virtual void deviceStopIdentify() = 0;
+
+    QList<QByteArray> getFeaturesThatNeedToIdentify() {return m_featuresThatNeedToIdentify;};
 
 private:
     void onEnrollStart(const QDBusMessage &message, const QString &extraInfo);
@@ -85,21 +93,23 @@ private:
     virtual void doingEnrollStart(const QString &extraInfo) = 0;
     virtual void doingIdentifyStart(const QString &value) = 0;
 
-private Q_SLOTS:
-    void onNameLost(const QString &serviceName);
-
-private:
     void registerDBusObject();
     void initServiceWatcher();
+
+    QList<QByteArray> findFeaturesByFeatureIDs(const QStringList &featureIDs);
+
+private Q_SLOTS:
+    void onNameLost(const QString &serviceName);
 
 Q_SIGNALS:
     void retry();
 
 protected:
     QSharedPointer<AuthDeviceAdaptor> m_dbusAdaptor;
-    QStringList m_identifyIDs;
 
 private:
+    QList<QByteArray> m_featuresThatNeedToIdentify;
+
     QString m_driverName;
     QString m_deviceID;
 

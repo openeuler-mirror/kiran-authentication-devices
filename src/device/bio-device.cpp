@@ -22,8 +22,8 @@ namespace Kiran
 {
 #define TEMPLATE_MAX_NUMBER 1000
 
-BioDevice::BioDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject *parent) : AuthDevice{vid,pid,driver,parent},
-                                        m_futureWatcher(nullptr)
+BioDevice::BioDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent) : AuthDevice{vid, pid, driver, parent},
+                                                                                                  m_futureWatcher(nullptr)
 {
     initFutureWatcher();
 }
@@ -36,7 +36,7 @@ void BioDevice::doingEnrollStart(const QString &extraInfo)
 {
     KLOG_DEBUG() << "biological information enroll start";
     // 获取当前保存的特征模板，判断是否达到最大数目
-    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(),deviceSerialNumber());
+    QByteArrayList saveList = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(), deviceSerialNumber());
     if (saveList.count() == TEMPLATE_MAX_NUMBER)
     {
         QString message = tr("feature has reached the upper limit of %1").arg(TEMPLATE_MAX_NUMBER);
@@ -87,30 +87,6 @@ void BioDevice::doingIdentifyStart(const QString &value)
     m_dbusAdaptor->IdentifyStatus("", ENROLL_STATUS_NORMAL, message);
 }
 
-void BioDevice::internalStopEnroll()
-{
-    if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
-    {
-        acquireFeatureStop();
-        m_enrollTemplates.clear();
-        setDeviceStatus(DEVICE_STATUS_IDLE);
-        clearWatchedServices();
-        KLOG_DEBUG() << QString("device type:%1,internal enroll stop").arg(deviceType());
-    }
-}
-
-void BioDevice::internalStopIdentify()
-{
-    if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
-    {
-        acquireFeatureStop();
-        m_identifyIDs.clear();
-        setDeviceStatus(DEVICE_STATUS_IDLE);
-        clearWatchedServices();
-        KLOG_DEBUG() << QString("device type:%1,internal identify stop").arg(deviceType());
-    }
-}
-
 void BioDevice::doingEnrollProcess(QByteArray feature)
 {
     int templatesCount = enrollTemplatesFromCache().count();
@@ -146,12 +122,13 @@ void BioDevice::doingEnrollProcess(QByteArray feature)
     else if (enrollTemplatesFromCache().count() == mergeTemplateCount())
     {
         enrollTemplateMerge();
+        internalStopEnroll();
     }
 }
 
 void BioDevice::doingIdentifyProcess(QByteArray feature)
 {
-    QString featureID = identifyFeature(feature, m_identifyIDs);
+    QString featureID = identifyFeature(feature, getFeaturesThatNeedToIdentify());
     if (!featureID.isEmpty())
     {
         notifyIdentifyProcess(IDENTIFY_PROCESS_MACTCH, featureID);
@@ -208,6 +185,17 @@ void BioDevice::saveEnrollTemplateToCache(QByteArray enrollTemplate)
     }
 }
 
+void BioDevice::deviceStopEnroll()
+{
+    acquireFeatureStop();
+    m_enrollTemplates.clear();
+}
+
+void BioDevice::deviceStopIdentify()
+{
+    acquireFeatureStop();
+}
+
 void BioDevice::enrollProcessRetry()
 {
     Q_EMIT this->retry();
@@ -215,7 +203,8 @@ void BioDevice::enrollProcessRetry()
 
 QString BioDevice::isFeatureEnrolled(QByteArray fpTemplate)
 {
-    return identifyFeature(fpTemplate, QStringList());
+    QList<QByteArray> features = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(), deviceSerialNumber());
+    return identifyFeature(fpTemplate, features);
 }
 
 void BioDevice::initFutureWatcher()
