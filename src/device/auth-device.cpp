@@ -43,7 +43,11 @@ bool AuthDevice::init()
         return false;
     }
     m_dbusAdaptor = QSharedPointer<AuthDeviceAdaptor>(new AuthDeviceAdaptor(this));
+#if (QT_VERSION >= QT_VERSION_CHECK(5, 11, 0))
     m_deviceID = QUuid::createUuid().toString(QUuid::WithoutBraces);
+#else
+    m_deviceID = QUuid::createUuid().toString().remove('{').remove('}');
+#endif
     m_deviceStatus = DEVICE_STATUS_IDLE;
     registerDBusObject();
     initServiceWatcher();
