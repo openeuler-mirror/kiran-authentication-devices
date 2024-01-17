@@ -62,6 +62,7 @@ private:
     void onRemove(const QDBusMessage &message, const QString &feature_id);
     void onSetEnableDriver(const QDBusMessage &message, const QString &driver_name, bool enable);
     QList<QSharedPointer<AuthDevice>> createDevices(const DeviceInfo &deviceInfo);
+    void removeDevice(QSharedPointer<AuthDevice> device);
 
 private:
     static AuthDeviceManager *m_instance;

@@ -13,6 +13,7 @@
  */
 #pragma once
 #include <QString>
+#include "auth-enum.h"
 
 namespace Kiran
 {
@@ -50,9 +51,12 @@ public:
     static QStringList getDriverList();
 
     static bool driverEnabled(const QString &vid, const QString &pid);
+    static bool driverEnabled(const QString & driverName);
+
     static void setDriverEnabled(const QString& driverName, bool enable);
     static bool isDeviceSupported(const QString &vid, const QString &pid);
-    
+
+    static QList<DeviceInfo> getDeviceIDsSupportedByDriver(const QString& driverName);
 private:
 };
 

@@ -183,43 +183,53 @@ void AuthDeviceManager::onRemove(const QDBusMessage& message, const QString& fea
 // TODO:是否需要监听配置文件的改变
 void AuthDeviceManager::onSetEnableDriver(const QDBusMessage& message, const QString& driver_name, bool enable)
 {
+    KLOG_DEBUG() << "set driver name:" << driver_name << "enable:" << enable;
     QStringList driverList = ConfigHelper::getDriverList();
     QDBusMessage replyMessage;
 
-    do
+    if (!driverList.contains(driver_name))
     {
-        if (!driverList.contains(driver_name))
-        {
-            replyMessage = message.createErrorReply(QDBusError::Failed, "No driver with the corresponding name was found.");
-            break;
-        }
-        ConfigHelper::setDriverEnabled(driver_name, enable);
-        replyMessage = message.createReply();
+        replyMessage = message.createErrorReply(QDBusError::Failed, "No driver with the corresponding name was found.");
+        QDBusConnection::systemBus().send(replyMessage);
+        return;
+    }
 
-        if (enable)
-        {
-            break;
-        }
+    bool oldDriverStatus = ConfigHelper::driverEnabled(driver_name);
 
-        // 驱动被禁用，将当前正在使用的设备释放掉
+    ConfigHelper::setDriverEnabled(driver_name, enable);
+    replyMessage = message.createReply();
+    QDBusConnection::systemBus().send(replyMessage);
+
+    // 若之前驱动已经关闭，启用驱动后，遍历设备，加载可用的设备
+    if (enable && !oldDriverStatus)
+    {
+        //NOTE：注意，此处是从配置文件中读出所支持的Vid和Pid，获取不到所支持的设备的BusPath，因此这里返回的DeviceInfo的BusPath为空
+        QList<DeviceInfo> devices = ConfigHelper::getDeviceIDsSupportedByDriver(driver_name);
+        for (auto device : devices)
+        {
+            if(!Utils::isExistDevice(device.idVendor,device.idProduct))
+            {
+                continue;
+            }
+            device.busPath = Utils::getBusPath(device.idVendor,device.idProduct);
+            handleDeviceAdded(device);
+        }
+        return;
+    }
+
+    // 若之前驱动开启，现在关闭驱动，将当前正在使用的设备释放掉
+    if (!enable && oldDriverStatus)
+    {
         auto devices = m_deviceMap.values();
-        Q_FOREACH (AuthDevicePtr device, devices)
+        for (AuthDevicePtr device : devices)
         {
             if (device->driverName() != driver_name)
             {
                 continue;
             }
-            QString deviceID = device->deviceID();
-            int deviceType = device->deviceType();
-            device->deleteLater();
-            QString key = m_deviceMap.key(device);
-            m_deviceMap.remove(key);
-            Q_EMIT m_dbusAdaptor->DeviceDeleted(deviceType, deviceID);
-            KLOG_INFO() << QString("destroyed deviceType: %1, deviceID:%2").arg(deviceType).arg(deviceID);
+            removeDevice(device);
         }
-    } while (false);
-
-    QDBusConnection::systemBus().send(replyMessage);
+    }
 }
 
 AuthDeviceList AuthDeviceManager::createDevices(const DeviceInfo& deviceInfo)
@@ -256,6 +266,21 @@ AuthDeviceList AuthDeviceManager::createDevices(const DeviceInfo& deviceInfo)
 
     AuthDeviceList deviceList = DeviceCereator::getInstance()->createDevices(vid, pid, driverPtr);
     return deviceList;
+}
+
+void AuthDeviceManager::removeDevice(QSharedPointer<AuthDevice> device)
+{
+    QString deviceID = device->deviceID();
+    int deviceType = device->deviceType();
+    QString deviceName = device->driverName();
+
+    QString key = m_deviceMap.key(device);
+    int count = m_deviceMap.remove(key);
+    KLOG_DEBUG() << "remove device count:" << count;
+
+    device->deleteLater();
+    Q_EMIT m_dbusAdaptor->DeviceDeleted(deviceType, deviceID);
+    KLOG_INFO() << QString("destroyed  deviceName: %1 , bus path : %2 , deviceType: %3, deviceID:%4").arg(deviceName).arg(key).arg(deviceType).arg(deviceID);
 }
 
 CHECK_AUTH_WITH_1ARGS(AuthDeviceManager, Remove, onRemove, AUTH_USER_ADMIN, const QString&)

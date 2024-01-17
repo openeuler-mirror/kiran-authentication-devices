@@ -42,6 +42,7 @@ FVSDDevice::FVSDDevice(const QString &vid, const QString &pid, DriverPtr driver,
 
 FVSDDevice::~FVSDDevice()
 {
+    KLOG_DEBUG() << "destroy FVSD Device";
     if (m_driver->isLoaded())
     {
         acquireFeatureStop();

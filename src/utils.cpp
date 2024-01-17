@@ -101,5 +101,29 @@ QJsonValue getValueFromJsonString(const QString& json, const QString& key)
     return jsonObject.value(key);
 }
 
+bool isExistDevice(const QString& idVendor, const QString& idProduct)
+{
+    DeviceInfo deviceInfo;
+    deviceInfo.idVendor = idVendor;
+    deviceInfo.idProduct = idProduct;
+    deviceInfo.busPath = "";
+    QList<DeviceInfo> devices = enumerateDevices();
+    return devices.contains(deviceInfo);
+}
+
+QString getBusPath(const QString& idVendor, const QString& idProduct)
+{
+    QList<DeviceInfo> devices = enumerateDevices();
+    for (auto device : devices)
+    {
+        if (device.idVendor == idVendor &&
+            device.idProduct == idProduct)
+        {
+            return device.busPath;
+        }
+    }
+    return QString();
+}
+
 }  // namespace Utils
 }  // namespace Kiran

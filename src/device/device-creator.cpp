@@ -45,6 +45,7 @@ DeviceCereator::~DeviceCereator()
 {
 }
 
+//TODO:将设备的BusPath作为入參创建设备，处理存在多个一模一样（vid和pid相同）的设备同时存在的场景
 AuthDeviceList DeviceCereator::createDevices(const QString &vid, const QString &pid, DriverPtr driver)
 {
     AuthDeviceList deviceList;
