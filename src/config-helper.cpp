@@ -113,6 +113,18 @@ bool ConfigHelper::driverEnabled(const QString &vid, const QString &pid)
     return enable;
 }
 
+bool ConfigHelper::driverEnabled(const QString &driverName)
+{
+    bool enable = false;
+    QSettings confSettings(DRIVER_CONF, QSettings::NativeFormat);
+    QStringList driverList = confSettings.childGroups();
+    if (driverList.contains(driverName))
+    {
+        enable = confSettings.value(QString("%1/Enable").arg(driverName)).toBool();
+    }    
+    return enable;
+}
+
 void ConfigHelper::setDriverEnabled(const QString &driverName, bool enable)
 {
     QSettings confSettings(DRIVER_CONF, QSettings::NativeFormat);
@@ -145,6 +157,42 @@ bool ConfigHelper::isDeviceSupported(const QString &vid, const QString &pid)
         confSettings.endGroup();
     }
     return false;
+}
+
+QList<DeviceInfo> ConfigHelper::getDeviceIDsSupportedByDriver(const QString &driverName)
+{
+    QList<DeviceInfo> deviceInfos;
+
+    QSettings confSettings(DEVICE_CONF, QSettings::NativeFormat);
+    QStringList deviceList = confSettings.childGroups();
+    for (auto deviceConf : deviceList)
+    {
+        confSettings.beginGroup(deviceConf);
+        if (confSettings.value("Driver").toString() != driverName)
+        {
+            confSettings.endGroup();
+            continue;
+        }
+
+        QStringList idList = confSettings.value("Id").toStringList();
+        for (const QString &id : idList)
+        {
+            QStringList idItems = id.split(":");
+            if (idItems.count() != 2)
+            {
+                continue;
+            }
+
+            DeviceInfo deviceinfo;
+            deviceinfo.idVendor = idItems.value(0);
+            deviceinfo.idProduct = idItems.value(1);
+
+            deviceInfos << deviceinfo;
+          }
+        confSettings.endGroup();
+    }
+
+    return deviceInfos;
 }
 
 }  // namespace Kiran

@@ -51,6 +51,7 @@ UKeySKFDevice::UKeySKFDevice(const QString &vid, const QString &pid, DriverPtr d
 
 UKeySKFDevice::~UKeySKFDevice()
 {
+    KLOG_DEBUG() << "destroy UKey SKF Device";
     int index = m_existingSerialNumber.indexOf(deviceSerialNumber());
     m_existingSerialNumber.removeAt(index);
     KLOG_DEBUG() << "destory device, serialNumber:" << deviceSerialNumber();

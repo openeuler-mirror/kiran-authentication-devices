@@ -49,6 +49,7 @@ FPZKDevice::FPZKDevice(const QString& vid, const QString& pid, DriverPtr driver,
 // 析构时对设备进行资源回收
 FPZKDevice::~FPZKDevice()
 {
+    KLOG_DEBUG() << "destroy FPZK Device";
     acquireFeatureStop();
 
     if (m_driver->isLoaded())

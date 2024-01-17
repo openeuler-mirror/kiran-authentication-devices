@@ -33,6 +33,7 @@ MFIriStarDevice::MFIriStarDevice(const QString &vid, const QString &pid, DriverP
     m_driver = driver.dynamicCast<MFIriStarDriver>();
     m_driver->ref();
     m_driver->setDeviceInfo(vid,pid);
+    setDriverName(IRISTAR_DRIVER_NAME);
 
     qRegisterMetaType<EnrollProcess>("EnrollProcess");
     qRegisterMetaType<IdentifyProcess>("IdentifyProcess");
@@ -44,6 +45,7 @@ MFIriStarDevice::MFIriStarDevice(const QString &vid, const QString &pid, DriverP
 
 MFIriStarDevice::~MFIriStarDevice()
 {
+    KLOG_DEBUG() << "destroy MFIriStar Device";
     m_driver->unref();
     if (m_driver->refCount() <= 0)
     {

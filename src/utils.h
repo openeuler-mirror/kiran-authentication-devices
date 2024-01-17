@@ -28,5 +28,9 @@ QString getDeviceName(const QString& idVendor, const QString& idProduct);
 
 QJsonValue getValueFromJsonString(const QString& json, const QString& key);
 
+bool isExistDevice(const QString& idVendor, const QString& idProduct);
+
+QString getBusPath(const QString& idVendor, const QString& idProduct);
+
 }  // namespace Utils
 }  // namespace Kiran
