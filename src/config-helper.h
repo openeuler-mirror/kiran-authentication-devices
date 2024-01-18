@@ -12,7 +12,8 @@
  * Author: luoqing <luoqing@kylinsec.com.cn>
  */
 #pragma once
-#include <QObject>
+#include <QString>
+#include "auth-enum.h"
 
 namespace Kiran
 {
@@ -24,16 +25,25 @@ struct DeviceConf
     QString vid;
     QString pid;
     QString driver;
+};
+
+struct DriverConf
+{
+    QString driverName;
+    bool enable; 
+    int type;
     QString libPath;
 };
 
-class ConfigHelper : public QObject
+class ConfigHelper
 {
 public:
-    ConfigHelper(QObject *parent = nullptr) : QObject(parent){};
+    ConfigHelper() {};
     ~ConfigHelper(){};
 
     static DeviceConf getDeviceConf(const QString &vid, const QString &pid);
+    static DriverConf getDriverConf(const QString &vid, const QString &pid);
+    
     static QString getDriverName(const QString &vid, const QString &pid);
     static QString getDeviceName(const QString &vid, const QString &pid);
     static QString getLibPath(const QString &vid, const QString &pid);
@@ -41,9 +51,12 @@ public:
     static QStringList getDriverList();
 
     static bool driverEnabled(const QString &vid, const QString &pid);
+    static bool driverEnabled(const QString & driverName);
+
     static void setDriverEnabled(const QString& driverName, bool enable);
     static bool isDeviceSupported(const QString &vid, const QString &pid);
-    
+
+    static QList<DeviceInfo> getDeviceIDsSupportedByDriver(const QString& driverName);
 private:
 };
 

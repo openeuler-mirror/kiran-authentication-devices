@@ -20,7 +20,7 @@ class BioDevice : public AuthDevice
 {
     Q_OBJECT
 public:
-    explicit BioDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject *parent = nullptr);
+    explicit BioDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
     ~BioDevice();
     int mergeTemplateCount() { return m_mergeTemplateCount; };
     void setMergeTemplateCount(int count) { m_mergeTemplateCount = count; };
@@ -29,16 +29,16 @@ protected:
     virtual QByteArray acquireFeature() = 0;
     virtual void acquireFeatureStop() = 0;
     virtual void acquireFeatureFail() = 0;
-    virtual QString identifyFeature(QByteArray feature, QStringList featureIDs) = 0;
-    
-    virtual void enrollTemplateMerge() {};
-    virtual int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) {return GENERAL_RESULT_OK;};
-    
-    void internalStopEnroll() override;
-    void internalStopIdentify() override;
+    virtual QString identifyFeature(QByteArray feature, QList<QByteArray> existedfeatures) = 0;
+
+    virtual void enrollTemplateMerge(){};
+    virtual int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) { return GENERAL_RESULT_OK; };
+
+    virtual void deviceStopEnroll() override;
+    virtual void deviceStopIdentify() override;
 
     virtual void enrollProcessRetry();
-    //TODO:优化通知
+    // TODO:优化通知
     virtual void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString()) = 0;
     virtual void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString()) = 0;
 

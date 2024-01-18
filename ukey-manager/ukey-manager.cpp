@@ -4,6 +4,7 @@
 #include "ukey-skf-driver.h"
 #include  <QSettings>
 #include "auth-enum.h"
+#include "config.h"
 
 #define DEFAULT_USER_PINCODE "12345678"
 
@@ -62,7 +63,6 @@ bool UkeyManager::initDriver()
 ULONG UkeyManager::resetUkey()
 {
     ULONG ulReval = m_driver->resetUkey(m_devHandle);
-    m_driver->disConnectDev(m_devHandle);
     return ulReval;
 }
 

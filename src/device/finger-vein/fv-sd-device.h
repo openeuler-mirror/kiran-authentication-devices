@@ -33,9 +33,9 @@ class FVSDDevice : public BioDevice
 public:
     explicit FVSDDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject *parent = nullptr);
     ~FVSDDevice();
-    bool initDevice() override;
 
 private:
+    bool initDevice() override;
     QByteArray acquireFeature() override;
     void acquireFeatureStop() override;
     void acquireFeatureFail() override;
@@ -46,7 +46,7 @@ private:
     void enrollProcessRetry() override;
 
     QString isFeatureEnrolled(QByteArray fpTemplate) override;
-    QString identifyFeature(QByteArray feature, QStringList featureIDs) override;
+    QString identifyFeature(QByteArray feature, QList<QByteArray> existedfeatures) override;
 
     void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString()) override;
     void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString()) override;

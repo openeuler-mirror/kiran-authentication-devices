@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "device/device-creator.h"
 #include "config-helper.h"
+#include "feature-db.h"
 
 namespace Kiran
 {
@@ -29,11 +30,10 @@ REGISTER_DEVICE(IRISTAR_DRIVER_NAME,MFIriStarDevice);
 MFIriStarDevice::MFIriStarDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent) : 
                                 AuthDevice(vid, pid, driver, parent)
 {
-    setDeviceName(ConfigHelper::getDriverName(vid,pid));
-    
     m_driver = driver.dynamicCast<MFIriStarDriver>();
     m_driver->ref();
     m_driver->setDeviceInfo(vid,pid);
+    setDriverName(IRISTAR_DRIVER_NAME);
 
     qRegisterMetaType<EnrollProcess>("EnrollProcess");
     qRegisterMetaType<IdentifyProcess>("IdentifyProcess");
@@ -45,6 +45,7 @@ MFIriStarDevice::MFIriStarDevice(const QString &vid, const QString &pid, DriverP
 
 MFIriStarDevice::~MFIriStarDevice()
 {
+    KLOG_DEBUG() << "destroy MFIriStar Device";
     m_driver->unref();
     if (m_driver->refCount() <= 0)
     {
@@ -63,8 +64,10 @@ bool MFIriStarDevice::initDevice()
 }
 
 void MFIriStarDevice::doingEnrollStart(const QString &extraInfo)
-{
-    m_driver->doingEnrollStart(deviceType());
+{   
+    QList<QByteArray> features = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(), deviceSerialNumber());
+    // 注册前需要传入已经存在的特征，判断之前是否注册过
+    m_driver->doingEnrollStart(deviceType(),features);
     QString message;
     if (deviceType() == DEVICE_TYPE_Iris)
     {
@@ -79,7 +82,7 @@ void MFIriStarDevice::doingEnrollStart(const QString &extraInfo)
 
 void MFIriStarDevice::doingIdentifyStart(const QString &value)
 {
-    m_driver->doingIdentifyStart(deviceType(), m_identifyIDs);
+    m_driver->doingIdentifyStart(deviceType(), getFeaturesThatNeedToIdentify());
     QString message;
     if (deviceType() == DEVICE_TYPE_Iris)
     {
@@ -92,27 +95,14 @@ void MFIriStarDevice::doingIdentifyStart(const QString &value)
     m_dbusAdaptor->IdentifyStatus("", ENROLL_STATUS_NORMAL, message);
 }
 
-void MFIriStarDevice::internalStopEnroll()
+void MFIriStarDevice::deviceStopEnroll()
 {
-    if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
-    {
-        m_driver->stop();
-        setDeviceStatus(DEVICE_STATUS_IDLE);
-        clearWatchedServices();
-        KLOG_DEBUG() << "stop Enroll";
-    }
+    m_driver->stop();
 }
 
-void MFIriStarDevice::internalStopIdentify()
+void MFIriStarDevice::deviceStopIdentify()
 {
-    if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
-    {
-        m_driver->stop();
-        m_identifyIDs.clear();
-        setDeviceStatus(DEVICE_STATUS_IDLE);
-        clearWatchedServices();
-        KLOG_DEBUG() << "stop Identify";
-    }
+    m_driver->stop();
 }
 
 void MFIriStarDevice::onEnrollProcess(EnrollProcess process, DeviceType type, const QString &featureID)

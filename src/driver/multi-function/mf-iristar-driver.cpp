@@ -17,12 +17,14 @@
 #include <qt5-log-i.h>
 #include <sys/time.h>
 #include <QCryptographicHash>
+#include <QProcess>
 #include <functional>
 #include <iostream>
 #include "auth-enum.h"
 #include "auth_device_adaptor.h"
 #include "driver/driver-factory.h"
 #include "feature-db.h"
+#include "utils.h"
 
 namespace Kiran
 {
@@ -46,6 +48,7 @@ std::function<Ret(Params...)> Callback<Ret(Params...)>::func;
 
 #define IRIS_IS_DRIVER_LIB "libirs_sdk2.so"
 #define IRIS_IS_STARTUP_CONFIG_PATH "/etc/kiran-authentication-devices-sdk/iristar/config/sdkcfg.ini"
+#define SYSTEMCTL_RESTART_SERVICE "systemctl restart kiran-authentication-devices.service"
 
 #define IRIS_FEATURE_LEN 512   // 单个虹膜特征数据长度
 #define FACE_FEATURE_LEN 2048  // 单个人脸特征数据长度
@@ -122,13 +125,18 @@ MFIriStarDriver::MFIriStarDriver(QObject *parent) : Driver{parent}
 
 MFIriStarDriver::~MFIriStarDriver()
 {
-    if (m_driverLib->isLoaded && m_irsHandle)
-    {
-        bool enable = false;
-        m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_IRIS_LIGHT, &enable, sizeof(enable));
-        m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_CANCEL_OPR, NULL, 0);  // 停止当前正在进行的流程
-        m_driverLib->IRS_releaseInstance(m_irsHandle);
-    }
+    KLOG_DEBUG() << "destroy IriStar driver";
+    /*
+     if (m_driverLib->isLoaded && m_irsHandle )
+     {
+         KLOG_DEBUG() << "start release IriStar Instance";
+         bool enable = false;
+         m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_IRIS_LIGHT, &enable, sizeof(enable));
+         m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_CANCEL_OPR, NULL, 0);  // 停止当前正在进行的流程
+         m_driverLib->IRS_releaseInstance(m_irsHandle);
+         KLOG_DEBUG() << "release IriStar Instance end";
+     }
+     */
 
     if (m_libHandle)
     {
@@ -137,6 +145,25 @@ MFIriStarDriver::~MFIriStarDriver()
     }
 
     m_driverLib.clear();
+
+    /**
+     * FIXME:
+     * 1、IriStart 设备不支持热插拔
+     * 当设备拔出后，调用SDK中的IRS_releaseInstance释放资源，IRS_releaseInstance会搜索设备，如果没有搜索到设备，将一直循环搜索设备，导致进程卡死
+     * 如果设备突然被拔出，则IRS_releaseInstance函数无效且一直无法释放资源，造成内存泄漏
+     *
+     * 2、注意，即使在设备存在的情况下，调用IRS_releaseInstance 释放资源，也会失败
+     * 注意，即使在设备存在的情况下，调用IRS_releaseInstance 释放资源，也会失败，在IRS_releaseInstance函数中阻塞
+     * 查看堆栈，调用关系为 IRS_releaseInstance -> pthread_cond_destroy ，发现最终阻塞在pthread_cond_destroy中
+     * 查阅资料，pthread_cond_destroy 用来销毁条件变量，但是销毁其他线程正在等待的cond将导致不确定行为，并阻塞。
+     * 该设备驱动在运行过程中会创建非常多的线程，由于设备SDK提供商对线程操作的不合理，导致了阻塞。
+     *
+     * 由于不知道驱动SDK的源代码和具体线程操作逻辑，此问题无法修复，只能规避
+     * 因此，在释放对象时，暂时重启设备管理服务，以释放资源，进行规避
+     */
+    KLOG_INFO() << "restart the service, because IriStart device  cannot release resources";
+    QProcess process;
+    process.startDetached(SYSTEMCTL_RESTART_SERVICE);
 }
 
 bool MFIriStarDriver::initDriver(const QString &libPath)
@@ -264,11 +291,13 @@ void MFIriStarDriver::reset()
 }
 
 /**
+ * 开启注册流程，用于获取人脸/虹膜注册特征信息和图像，非阻塞调用。结果数据通过结果回调函数irsResultCallback返回
+ * 采集数据的特征类型，只支持I/F，其中I表示虹膜，F表示人脸
  * 注册模式：F-人脸 I-双眼 l-单左眼 r-单右眼
  * 识别模式：F-人脸 I-双眼
  * 识别虹膜时不区分单双眼，只传双眼即可；只有W200设备支持注册时选择单双眼，其他设备全部是双眼
  */
-void MFIriStarDriver::doingEnrollStart(DeviceType deviceType)
+void MFIriStarDriver::doingEnrollStart(DeviceType deviceType, QList<QByteArray> existedfeatures)
 {
     if (deviceType == DEVICE_TYPE_Iris)
     {
@@ -283,12 +312,22 @@ void MFIriStarDriver::doingEnrollStart(DeviceType deviceType)
     setVideoStream(m_algorithmType.c_str());
     setDeviceStatus(DEVICE_STATUS_DOING_ENROLL);
 
-    // 开启注册流程，用于获取人脸/虹膜注册特征信息和图像，非阻塞调用。结果数据通过结果回调函数irsResultCallback返回
-    // 采集数据的特征类型，只支持I/F，其中I表示虹膜，F表示人脸
-    int retVal = prepareEnroll(m_algorithmType.c_str());
+    // 已经存在的特征为空，说明未录入过
+    if (existedfeatures.count() == 0)
+    {
+        Q_EMIT addFeature();
+        return;
+    }
+    // 注册前需要开启识别流程判断之前是否注册过
+    int retVal = startIdentify(existedfeatures);
+    if (retVal == -1)
+    {
+        Q_EMIT addFeature();
+        return;
+    }
 }
 
-void MFIriStarDriver::doingIdentifyStart(DeviceType deviceType, QStringList featureIDs)
+void MFIriStarDriver::doingIdentifyStart(DeviceType deviceType, QList<QByteArray> features)
 {
     if (deviceType == DEVICE_TYPE_Iris)
     {
@@ -303,7 +342,7 @@ void MFIriStarDriver::doingIdentifyStart(DeviceType deviceType, QStringList feat
     setVideoStream(m_algorithmType.c_str());
     setDeviceStatus(DEVICE_STATUS_DOING_IDENTIFY);
 
-    int retVal = startIdentify(featureIDs);
+    int retVal = startIdentify(features);
 
     if (retVal != GENERAL_RESULT_OK)
     {
@@ -346,56 +385,18 @@ bool MFIriStarDriver::isLoaded()
     return m_driverLib->isLoaded;
 }
 
-int MFIriStarDriver::prepareEnroll(const char *objectType)
+int MFIriStarDriver::startIdentify(QList<QByteArray> features)
 {
-    KLOG_DEBUG() << "prepareEnroll";
-    // 注册前需要开启识别流程判断之前是否注册过
-    int retVal = startIdentify(QStringList());
-    if (retVal == -1)
-    {
-        KLOG_DEBUG() << "add Feature";
-        Q_EMIT addFeature();
-    }
-    return retVal;
-}
-
-int MFIriStarDriver::startIdentify(QStringList featureIDs)
-{
-    KLOG_DEBUG() << "startIdentify";
-    // TODO:这段代码有多处使用，可以提炼复用
-    QList<QByteArray> saveList;
-    QString featureID;
-
-    if (featureIDs.isEmpty())
-    {
-        saveList = FeatureDB::getInstance()->getFeatures(m_idVendor, m_idProduct, (DeviceType)m_currentDeviceType, QString());
-    }
-    else
-    {
-        Q_FOREACH (auto id, featureIDs)
-        {
-            QByteArray feature = FeatureDB::getInstance()->getFeature(id);
-            if (!feature.isEmpty())
-                saveList << feature;
-        }
-    }
-
-    if (saveList.count() == 0)
-    {
-        KLOG_DEBUG() << " no features in the database";
-        return -1;
-    }
-
     int retVal = 0;
-    m_identifyFeatureCache = saveList;
+    m_identifyFeatureCache = features;
     // 识别类型，只支持I/F，其中I表示虹膜，F表示人脸
     if (m_algorithmType == ALGORITHM_TYPE_IRIS)
     {
-        retVal = identifyIris(saveList);
+        retVal = identifyIris(features);
     }
     else if (m_algorithmType == ALGORITHM_TYPE_FACE)
     {
-        retVal = identifyFace(saveList);
+        retVal = identifyFace(features);
     }
 
     return retVal;
@@ -480,7 +481,6 @@ void MFIriStarDriver::onStartEnroll()
     }
 
     retVal = m_driverLib->IRS_control(m_irsHandle, IRS_CONTROL_START_ENROLL, (void *)m_algorithmType.c_str(), strlen(m_algorithmType.c_str()));
-    KLOG_DEBUG() << "IRS_CONTROL_START_ENROLL:" << retVal;
     if (retVal != GENERAL_RESULT_OK)
     {
         KLOG_ERROR() << "start enroll failed:" << retVal;
