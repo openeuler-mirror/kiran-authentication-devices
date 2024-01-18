@@ -11,7 +11,7 @@ endif()
 file(GLOB CONF_FILES ${PROJECT_SOURCE_DIR}/data/com*.conf)
 
 foreach(CONF_FILE IN LISTS CONF_FILES)
-  install(FILES ${CONF_FILE} DESTINATION ${SYSCONFDIR}/dbus-1/system.d)
+  install(FILES ${CONF_FILE} DESTINATION ${CMAKE_INSTALL_FULL_SYSCONFDIR}/dbus-1/system.d)
 endforeach()
 
 configure_file(kiran-authentication-devices.service.in
