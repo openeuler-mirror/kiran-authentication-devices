@@ -22,14 +22,12 @@
 
 namespace Kiran
 {
-class UKeyFTDevice : public AuthDevice
+class UKeySKFDevice : public AuthDevice
 {
     Q_OBJECT
 public:
-    explicit UKeyFTDevice(QObject *parent = nullptr);
-    ~UKeyFTDevice();
-
-    bool initDriver() override;
+    explicit UKeySKFDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
+    ~UKeySKFDevice();
 
     void resetUkey();
 
@@ -37,28 +35,32 @@ private Q_SLOTS:
     bool initSerialNumber();
 
 private:
+    bool initDevice() override;
     void doingEnrollStart(const QString &extraInfo) override;
     void doingIdentifyStart(const QString &value) override;
 
-    void internalStopEnroll() override;
-    void internalStopIdentify() override;
+    void deviceStopEnroll() override;
+    void deviceStopIdentify() override;
 
     void identifyKeyFeature(const QString &pin, QByteArray keyFeature);
 
     void bindingUKey(DEVHANDLE devHandle, const QString &pin);
     ULONG createContainer(const QString &pin, DEVHANDLE devHandle, HAPPLICATION *appHandle, HCONTAINER *containerHandle);
+
     bool isExistsApplication(DEVHANDLE devHandle, const QString &appName);
     bool isExistBinding();
+
     void notifyUKeyEnrollProcess(EnrollProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
     void notifyUKeyIdentifyProcess(IdentifyProcess process, ULONG error = SAR_OK, const QString &featureID = QString());
 
     QString getPinErrorReson(ULONG error);
 
 private:
-    ULONG m_retryCount = 1000000;
+    ULONG m_retryCount = 10;
     UKeySKFDriver *m_driver = nullptr;
     static QStringList m_existingSerialNumber;
     QTimer m_reInitSerialNumberTimer;
+    QString m_driverLibPath;
 };
 
 }  // namespace Kiran

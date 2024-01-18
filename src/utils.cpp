@@ -18,7 +18,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSettings>
-
+#include "config.h"
 
 namespace Kiran
 {
@@ -101,31 +101,28 @@ QJsonValue getValueFromJsonString(const QString& json, const QString& key)
     return jsonObject.value(key);
 }
 
-QStringList getDriverBlackList()
+bool isExistDevice(const QString& idVendor, const QString& idProduct)
 {
-    QSettings confSettings(DRIVER_BLACK_LIST_CONF, QSettings::NativeFormat);
-    return confSettings.value(CONF_FILE_DISABLE_DRIVER_NAME).toStringList();
+    DeviceInfo deviceInfo;
+    deviceInfo.idVendor = idVendor;
+    deviceInfo.idProduct = idProduct;
+    deviceInfo.busPath = "";
+    QList<DeviceInfo> devices = enumerateDevices();
+    return devices.contains(deviceInfo);
 }
 
-bool driverEnabled(const QString& driverName)
+QString getBusPath(const QString& idVendor, const QString& idProduct)
 {
-    QSettings confSettings(DRIVERS_CONF, QSettings::NativeFormat);
-    QVariant value = confSettings.value(QString("%1/Enable").arg(driverName));
-    if (value.isValid())
+    QList<DeviceInfo> devices = enumerateDevices();
+    for (auto device : devices)
     {
-        if (value.toString() == "false")
+        if (device.idVendor == idVendor &&
+            device.idProduct == idProduct)
         {
-            return false;
+            return device.busPath;
         }
-        else if (value.toString() == "true")
-        {
-            return true;
-        }
-        else
-            return false;
     }
-    else
-        return false;
+    return QString();
 }
 
 }  // namespace Utils

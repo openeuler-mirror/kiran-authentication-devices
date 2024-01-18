@@ -17,6 +17,7 @@
 #include <QFile>
 #include <QSettings>
 #include "auth-enum.h"
+#include "driver/driver-factory.h"
 
 namespace Kiran
 {
@@ -140,10 +141,13 @@ struct SKFDriverLib
     bool isLoaded = false;
 };
 
-UKeySKFDriver::UKeySKFDriver(QObject *parent) : QObject(parent),
+REGISTER_DRIVER(UKEY_SKF_DRIVER_NAME,UKeySKFDriver);
+
+UKeySKFDriver::UKeySKFDriver(QObject *parent) : Driver(parent),
                                                 m_libHandle(nullptr)
 {
     m_driverLib = QSharedPointer<SKFDriverLib>(new SKFDriverLib);
+    setName(UKEY_SKF_DRIVER_NAME);
 }
 
 UKeySKFDriver::~UKeySKFDriver()
@@ -155,7 +159,12 @@ UKeySKFDriver::~UKeySKFDriver()
     }
 }
 
-bool UKeySKFDriver::loadLibrary(QString libPath)
+bool UKeySKFDriver::initDriver(const QString &libPath)
+{
+    return true;
+}
+
+bool UKeySKFDriver::loadLibrary(const QString &libPath)
 {
     if (!QFile::exists(UKEY_DEFAULT_CONFIG))
     {
@@ -538,7 +547,7 @@ end:
     return ret;
 }
 
-ULONG UKeySKFDriver::verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature, ECCPUBLICKEYBLOB &publicKey)
+ULONG UKeySKFDriver::verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature, ECCPUBLICKEYBLOB *publicKey)
 {
     unsigned char *pbInData = NULL, pbHashData[33] = {0}, pbOutData[256] = {0};
     ULONG ulInLen = 0, ulOutLen = 0, ulHashLen = 0, ulIdLen = 7;
@@ -552,7 +561,7 @@ ULONG UKeySKFDriver::verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature
 
     memcpy(pucId, PUC_ID, 16);
     ulIdLen = 16;
-    ULONG ulReval = m_driverLib->SKF_DigestInit(devHandle, SGD_SM3, &publicKey, pucId, ulIdLen, &hHash);
+    ULONG ulReval = m_driverLib->SKF_DigestInit(devHandle, SGD_SM3, publicKey, pucId, ulIdLen, &hHash);
     if (ulReval != SAR_OK)
     {
         goto end;
@@ -565,10 +574,8 @@ ULONG UKeySKFDriver::verifyData(DEVHANDLE devHandle, ECCSIGNATUREBLOB &Signature
         goto end;
     }
 
-    ulReval = m_driverLib->SKF_ECCVerify(devHandle, &publicKey, pbHashData, ulHashLen, &Signature);
-
+    ulReval = m_driverLib->SKF_ECCVerify(devHandle, publicKey, pbHashData, ulHashLen, &Signature);
 end:
-    getErrorReason(ulReval);
     return ulReval;
 }
 

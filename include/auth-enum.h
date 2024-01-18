@@ -17,17 +17,18 @@
 #include <QString>
 namespace Kiran
 {
-
-#define FPRINT_DIR "/etc/kiran-authentication-devices/fingerprint"
-#define FACE_DIR "/etc/kiran-authentication-devices/face"
 #define DATABASE_DIR "/usr/share/kiran-authentication-devices"
-#define DRIVER_BLACK_LIST_CONF "/etc/kiran-authentication-device/driver-blacklist.conf"
-#define DRIVERS_CONF "/etc/kiran-authentication-devices/drivers.conf"
+
 #define AUTH_USER_ADMIN "com.kylinsec.kiran.authentication.user-administration"
 
 #define FT_UKEY_DRIVER_LIB "libes_3000gm.so"
 #define UKEY_APP_NAME "KIRAN-AUTHENTICATION-DEVICES"
 #define UKEY_CONTAINER_NAME "1003-3001"
+
+#define UKEY_SKF_DRIVER_NAME "ukey-skf"
+#define IRISTAR_DRIVER_NAME "irs_sdk2"
+#define FINGERPRINT_ZK_DRIVER_NAME "zkfp"
+#define FINGER_VEIN_SD_DRIVER_NAME "sdfv"
 
 struct DeviceInfo
 {
@@ -54,6 +55,19 @@ struct DeviceInfo
 
         return false;
     };
+
+    bool operator==(const DeviceInfo& dev) const
+    {
+        if (this->idVendor == dev.idVendor &&
+            this->idProduct == dev.idProduct)
+        {
+            return true;
+        }
+        else
+        {
+            return false;
+        }
+    }
 };
 
 enum GeneralResult

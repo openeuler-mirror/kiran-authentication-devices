@@ -25,18 +25,17 @@ enum ExtractFeatureMode
     EXTRACT_FEATURE_VERIFY     // 提取的特征验证时使用
 };
 
-struct FVSDDriverLib;
+class FVSDDriver;
+
 class FVSDDevice : public BioDevice
 {
     Q_OBJECT
 public:
-    explicit FVSDDevice(QObject *parent = nullptr);
+    explicit FVSDDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject *parent = nullptr);
     ~FVSDDevice();
-    bool initDriver() override;
 
 private:
-    bool loadLib();
-
+    bool initDevice() override;
     QByteArray acquireFeature() override;
     void acquireFeatureStop() override;
     void acquireFeatureFail() override;
@@ -47,7 +46,7 @@ private:
     void enrollProcessRetry() override;
 
     QString isFeatureEnrolled(QByteArray fpTemplate) override;
-    QString identifyFeature(QByteArray feature, QStringList featureIDs) override;
+    QString identifyFeature(QByteArray feature, QList<QByteArray> existedfeatures) override;
 
     void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString()) override;
     void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString()) override;
@@ -55,9 +54,7 @@ private:
     QByteArray getFeatureFromImage(QByteArray image, ExtractFeatureMode mode);
 
 private:
-    QSharedPointer<FVSDDriverLib> m_driverLib;
-    Handle m_libProcessHandle;
-    Handle m_libComHandle;
+    QSharedPointer<FVSDDriver> m_driver;
 };
 
 }  // namespace Kiran

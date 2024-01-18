@@ -3,12 +3,14 @@ set(TARGET_NAME kiran-ukey-manager)
 file(GLOB_RECURSE UKEY_MANAGER_SRC "./*.cpp" "./*.h")
 
 file(GLOB_RECURSE UKEY_DRIVER_SRC ${PROJECT_SOURCE_DIR}/src/driver/ukey/*.cpp 
-                                  ${PROJECT_SOURCE_DIR}/src/driver/ukey/*.h )
+                                  ${PROJECT_SOURCE_DIR}/src/driver/ukey/*.h
+                                  ${PROJECT_SOURCE_DIR}/src/driver/driver*
+                                  )
 
 set(DEVICE_SDK ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}/${PROJECT_NAME}-sdk)
 
 set(CMAKE_BUILD_WITH_INSTALL_RPATH TRUE)
-set(CMAKE_INSTALL_RPATH ${DEVICE_SDK}/ukey/ft)
+set(CMAKE_INSTALL_RPATH ${DEVICE_SDK}/ukey/skf)
 
 set(TS_FILES "${CMAKE_CURRENT_SOURCE_DIR}/translations/${TARGET_NAME}.zh_CN.ts")
 
@@ -24,6 +26,7 @@ add_executable(${TARGET_NAME}
         )
 
 target_include_directories(${TARGET_NAME} PRIVATE
+        ${PROJECT_SOURCE_DIR}/src        
         ${PROJECT_SOURCE_DIR}/src/driver/ukey
         ${PROJECT_SOURCE_DIR}/include
         ${KLOG_QT5_INCLUDE_DIRS}

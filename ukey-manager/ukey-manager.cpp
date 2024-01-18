@@ -2,8 +2,9 @@
 #include <qt5-log-i.h>
 #include <iostream>
 #include "ukey-skf-driver.h"
-
+#include  <QSettings>
 #include "auth-enum.h"
+#include "config.h"
 
 #define DEFAULT_USER_PINCODE "12345678"
 
@@ -41,7 +42,9 @@ UkeyManager::~UkeyManager()
 
 bool UkeyManager::initDriver()
 {
-    if (!m_driver->loadLibrary(FT_UKEY_DRIVER_LIB))
+    QSettings confSettings(UKEY_MANAGER_CONF, QSettings::NativeFormat);
+    QString libPath = confSettings.value("ukey/LibPath").toString();  
+    if (!m_driver->loadLibrary(libPath))
     {
         KLOG_DEBUG() << "load library  failed";
         std::cout << "load library  failed" << std::endl;
@@ -60,7 +63,6 @@ bool UkeyManager::initDriver()
 ULONG UkeyManager::resetUkey()
 {
     ULONG ulReval = m_driver->resetUkey(m_devHandle);
-    m_driver->disConnectDev(m_devHandle);
     return ulReval;
 }
 

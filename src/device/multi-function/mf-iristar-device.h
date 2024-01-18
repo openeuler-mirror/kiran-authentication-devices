@@ -23,16 +23,15 @@ class MFIriStarDevice : public AuthDevice
 {
     Q_OBJECT
 public:
-    explicit MFIriStarDevice(DeviceType deviceType, QObject *parent = nullptr);
+    explicit MFIriStarDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
     ~MFIriStarDevice();
 
-    bool initDriver() override;
-
 private:
+    bool initDevice() override;
     void doingEnrollStart(const QString &extraInfo) override;
     void doingIdentifyStart(const QString &value) override;
-    void internalStopEnroll() override;
-    void internalStopIdentify() override;
+    void deviceStopEnroll() override;
+    void deviceStopIdentify() override;
 
     void notifyEnrollProcess(EnrollProcess process, const QString &featureID = QString());
     void notifyIdentifyProcess(IdentifyProcess process, const QString &featureID = QString());
@@ -42,6 +41,6 @@ private Q_SLOTS:
     void onIdentifyProcess(IdentifyProcess process, DeviceType deviceType, const QString &featureID);
 
 private:
-    MFIriStarDriver *m_driver;
+    QSharedPointer<MFIriStarDriver> m_driver;
 };
 }  // namespace Kiran

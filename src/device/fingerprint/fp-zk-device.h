@@ -21,19 +21,18 @@
 namespace Kiran
 {
 typedef void* HANDLE;
-struct FPZKDriverLib;
+class FPZKDriver;
 
 class FPZKDevice : public BioDevice
 {
     Q_OBJECT
 public:
-    explicit FPZKDevice(QObject* parent = nullptr);
+    explicit FPZKDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject* parent = nullptr);
     ~FPZKDevice();
 
-    bool initDriver() override;
 
 private:
-    bool loadLib();
+    bool initDevice() override;
     QByteArray acquireFeature() override;
     // 停止采集指纹模板
     void acquireFeatureStop() override;
@@ -53,15 +52,14 @@ private:
     // 对比两枚指纹是否匹配
     int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
 
-    QString identifyFeature(QByteArray fpTemplate, QStringList featureIDs) override;
+    QString identifyFeature(QByteArray fpTemplate, QList<QByteArray> existedfeatures) override;
 
     bool saveFPrintTemplate(QByteArray fpTemplate, const QString& featureID);
 
     int getDevCount();
 
 private:
-    Handle m_libHandle;
     Handle m_hDBCache;
-    QSharedPointer<FPZKDriverLib> m_driverLib;
+    QSharedPointer<FPZKDriver> m_driver;
 };
 }  // namespace Kiran

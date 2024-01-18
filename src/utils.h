@@ -28,8 +28,9 @@ QString getDeviceName(const QString& idVendor, const QString& idProduct);
 
 QJsonValue getValueFromJsonString(const QString& json, const QString& key);
 
-QStringList getDriverBlackList();
+bool isExistDevice(const QString& idVendor, const QString& idProduct);
 
-bool driverEnabled(const QString& driverName);
+QString getBusPath(const QString& idVendor, const QString& idProduct);
+
 }  // namespace Utils
 }  // namespace Kiran

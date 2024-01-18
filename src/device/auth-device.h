@@ -21,45 +21,43 @@
 #include <QObject>
 #include <QSharedPointer>
 #include "auth-enum.h"
+#include "driver/driver.h"
 #include "kiran-auth-device-i.h"
+#include "device-creator.h"
 
 class AuthDeviceAdaptor;
 
 namespace Kiran
 {
 typedef void *Handle;
-class BDriver;
 
 class AuthDevice : public QObject, protected QDBusContext
 {
     Q_OBJECT
     Q_PROPERTY(QString DeviceID READ deviceID CONSTANT)
-    Q_PROPERTY(QString DeviceDriver READ deviceDriver CONSTANT)
+    Q_PROPERTY(QString DeviceDriver READ driverName CONSTANT)
     Q_PROPERTY(int DeviceType READ deviceType)
     Q_PROPERTY(int DeviceStatus READ deviceStatus)
 
 public:
-    explicit AuthDevice(QObject *parent = nullptr);
+    explicit AuthDevice(const QString &vid, const QString &pid, DriverPtr driver, QObject *parent = nullptr);
     virtual ~AuthDevice();
     bool init();
-    virtual bool initDriver() = 0;
 
     QDBusObjectPath getObjectPath() { return m_objectPath; };
-    QString deviceID() { return m_deviceID; };
-    QString deviceDriver() { return m_deviceDriver; };
-
+    
     DeviceType deviceType() { return m_deviceType; };
     DeviceStatus deviceStatus() { return m_deviceStatus; };
-    QString deviceName() { return m_deviceName; };
     DeviceInfo deviceInfo();
+    QString deviceName() { return m_deviceName; };
     QString deviceSerialNumber() { return m_serialNumber; };
+    QString deviceID() { return m_deviceID; };
 
-    void setDeviceType(DeviceType deviceType) { m_deviceType = deviceType; };
-    void setDeviceStatus(DeviceStatus deviceStatus) { m_deviceStatus = deviceStatus; };
-    void setDeviceName(const QString &deviceName) { m_deviceName = deviceName; };
-    void setDeviceInfo(const QString &idVendor, const QString &idProduct);
-    void setDeviceDriver(const QString &deviceDriver);
-    void setDeviceSerialNumber(const QString &serialNumber) {m_serialNumber = serialNumber;};
+    QString driverName() { return m_driverName; };
+
+private:
+    virtual bool initDevice() = 0;
+    friend AuthDeviceList DeviceCereator::createDevices(const QString &vid, const QString &pid, DriverPtr driver);
 
 public Q_SLOTS:
     virtual void EnrollStart(const QString &extraInfo);
@@ -69,9 +67,22 @@ public Q_SLOTS:
     virtual QStringList GetFeatureIDList();
 
 protected:
+    void setDeviceType(DeviceType deviceType) { m_deviceType = deviceType; };
+    void setDeviceStatus(DeviceStatus deviceStatus) { m_deviceStatus = deviceStatus; };
+    void setDeviceName(const QString &deviceName) { m_deviceName = deviceName; };
+    void setDeviceInfo(const QString &idVendor, const QString &idProduct);
+    void setDeviceSerialNumber(const QString &serialNumber) { m_serialNumber = serialNumber; };
+
+    void setDriverName(const QString &driverName) { m_driverName = driverName; };
+
     void clearWatchedServices();
-    virtual void internalStopEnroll() = 0;
-    virtual void internalStopIdentify() = 0;
+    void internalStopEnroll();
+    void internalStopIdentify();
+
+    virtual void deviceStopEnroll() = 0;
+    virtual void deviceStopIdentify() = 0;
+
+    QList<QByteArray> getFeaturesThatNeedToIdentify() {return m_featuresThatNeedToIdentify;};
 
 private:
     void onEnrollStart(const QDBusMessage &message, const QString &extraInfo);
@@ -82,22 +93,24 @@ private:
     virtual void doingEnrollStart(const QString &extraInfo) = 0;
     virtual void doingIdentifyStart(const QString &value) = 0;
 
-private Q_SLOTS:
-    void onNameLost(const QString &serviceName);
-
-private:
     void registerDBusObject();
     void initServiceWatcher();
+
+    QList<QByteArray> findFeaturesByFeatureIDs(const QStringList &featureIDs);
+
+private Q_SLOTS:
+    void onNameLost(const QString &serviceName);
 
 Q_SIGNALS:
     void retry();
 
 protected:
     QSharedPointer<AuthDeviceAdaptor> m_dbusAdaptor;
-    QStringList m_identifyIDs;
 
 private:
-    QString m_deviceDriver;
+    QList<QByteArray> m_featuresThatNeedToIdentify;
+
+    QString m_driverName;
     QString m_deviceID;
 
     DeviceType m_deviceType;

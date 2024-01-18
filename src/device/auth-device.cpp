@@ -18,6 +18,7 @@
 #include <QUuid>
 #include <QtConcurrent>
 #include "auth_device_adaptor.h"
+#include "config-helper.h"
 #include "feature-db.h"
 #include "kiran-auth-device-i.h"
 #include "polkit-proxy.h"
@@ -27,15 +28,17 @@ namespace Kiran
 {
 size_t AuthDevice::m_deviceObjectNum = 0;
 
-AuthDevice::AuthDevice(QObject* parent) : QObject(parent)
+AuthDevice::AuthDevice(const QString& vid, const QString& pid, DriverPtr driver, QObject* parent) : QObject(parent)
 {
+    setDeviceInfo(vid, pid);
+    setDeviceName(ConfigHelper::getDeviceName(vid, pid));
 }
 
 AuthDevice::~AuthDevice(){};
 
 bool AuthDevice::init()
 {
-    if (!initDriver())
+    if (!initDevice())
     {
         return false;
     }
@@ -93,15 +96,6 @@ void AuthDevice::onNameLost(const QString& serviceName)
     }
 }
 
-void AuthDevice::clearWatchedServices()
-{
-    QStringList watchedServices = m_serviceWatcher->watchedServices();
-    Q_FOREACH (auto service, watchedServices)
-    {
-        m_serviceWatcher->removeWatchedService(service);
-    }
-}
-
 DeviceInfo AuthDevice::deviceInfo()
 {
     DeviceInfo deviceInfo;
@@ -117,18 +111,53 @@ void AuthDevice::setDeviceInfo(const QString& idVendor, const QString& idProduct
     m_idProduct = idProduct;
 }
 
-void AuthDevice::setDeviceDriver(const QString& deviceDriver)
+void AuthDevice::clearWatchedServices()
 {
-    QString driverName;
-    if (deviceDriver.startsWith("lib"))
+    QStringList watchedServices = m_serviceWatcher->watchedServices();
+    Q_FOREACH (auto service, watchedServices)
     {
-        driverName = deviceDriver.mid(3, deviceDriver.indexOf(".so") - 3);
+        m_serviceWatcher->removeWatchedService(service);
     }
-    else
+}
+
+void AuthDevice::internalStopEnroll()
+{
+    if (deviceStatus() == DEVICE_STATUS_DOING_ENROLL)
     {
-        driverName = deviceDriver;
+        deviceStopEnroll();
+        setDeviceStatus(DEVICE_STATUS_IDLE);
+        clearWatchedServices();
+        KLOG_DEBUG() << QString("enroll stop, device type:%1,name:%2 ,id:%3")
+                            .arg(deviceType())
+                            .arg(deviceName())
+                            .arg(deviceID());
     }
-    m_deviceDriver = driverName;
+}
+
+void AuthDevice::internalStopIdentify()
+{
+    if (deviceStatus() == DEVICE_STATUS_DOING_IDENTIFY)
+    {
+        deviceStopIdentify();
+        m_featuresThatNeedToIdentify.clear();
+        setDeviceStatus(DEVICE_STATUS_IDLE);
+        clearWatchedServices();
+        KLOG_DEBUG() << QString("identify stop, device type:%1,name:%2 ,id:%3")
+                            .arg(deviceType())
+                            .arg(deviceName())
+                            .arg(deviceID());
+    }
+}
+
+QList<QByteArray> AuthDevice::findFeaturesByFeatureIDs(const QStringList& featureIDs)
+{
+    QList<QByteArray> saveList;
+    Q_FOREACH (auto id, featureIDs)
+    {
+        QByteArray feature = FeatureDB::getInstance()->getFeature(id);
+        saveList << feature;
+    }
+    return saveList;
 }
 
 void AuthDevice::onEnrollStart(const QDBusMessage& dbusMessage, const QString& extraInfo)
@@ -158,23 +187,39 @@ void AuthDevice::onEnrollStop(const QDBusMessage& dbusMessage)
 
 void AuthDevice::onIdentifyStart(const QDBusMessage& dbusMessage, const QString& value)
 {
-    QString message;
     if (deviceStatus() != DEVICE_STATUS_IDLE)
     {
-        message = tr("Device Busy");
+        QString message = tr("Device Busy");
         Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_NOT_MATCH, message);
-        KLOG_DEBUG() << QString("%1, deviceID:%2").arg(message).arg(deviceID());
+        KLOG_DEBUG() << QString("%1, deviceID:%2").arg("Device Busy").arg(deviceID());
         return;
     }
 
+    QStringList featureIDs;
     QJsonArray jsonArray = Utils::getValueFromJsonString(value, AUTH_DEVICE_JSON_KEY_FEATURE_IDS).toArray();
     if (!jsonArray.isEmpty())
     {
         QVariantList varList = jsonArray.toVariantList();
         Q_FOREACH (auto var, varList)
         {
-            m_identifyIDs << var.toString();
+            featureIDs << var.toString();
         }
+    }
+
+    if (featureIDs.isEmpty())
+    {
+        m_featuresThatNeedToIdentify = FeatureDB::getInstance()->getFeatures(deviceInfo().idVendor, deviceInfo().idProduct, deviceType(), deviceSerialNumber());
+    }
+    else
+    {
+        m_featuresThatNeedToIdentify = findFeaturesByFeatureIDs(featureIDs);
+    }
+
+    if (m_featuresThatNeedToIdentify.count() == 0)
+    {
+        KLOG_DEBUG() << "no found feature id";
+        Q_EMIT m_dbusAdaptor->IdentifyStatus("", IDENTIFY_STATUS_NOT_MATCH, tr("identify fail!"));
+        return;
     }
 
     setDeviceStatus(DEVICE_STATUS_DOING_IDENTIFY);
@@ -198,7 +243,7 @@ CHECK_AUTH(AuthDevice, IdentifyStop, onIdentifyStop, AUTH_USER_ADMIN)
 
 QStringList AuthDevice::GetFeatureIDList()
 {
-    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct,deviceType(),deviceSerialNumber());
+    QStringList featureIDs = FeatureDB::getInstance()->getFeatureIDs(m_idVendor, m_idProduct, deviceType(), deviceSerialNumber());
     return featureIDs;
 }
 
