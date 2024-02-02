@@ -183,10 +183,6 @@ QByteArray FPZKDevice::acquireFeature()
 void FPZKDevice::acquireFeatureStop()
 {
     m_doAcquire = false;
-    if (!m_futureWatcher.isNull())
-    {
-        m_futureWatcher->waitForFinished();
-    }
 }
 
 void FPZKDevice::acquireFeatureFail()
@@ -224,7 +220,7 @@ QByteArray FPZKDevice::templateMerge(QByteArray fpTemplate1,
     return regTemplate;
 }
 
-int FPZKDevice::enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
+int FPZKDevice::templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
 {
     int score = 0;
     score = m_driver->ZKFPM_DBMatch(m_hDBCache,
@@ -240,7 +236,7 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QList<QByteArray> exi
     for (int j = 0; j < existedfeatures.count(); j++)
     {
         auto saveTemplate = existedfeatures.value(j);
-        int ret = enrollTemplateMatch(fpTemplate, saveTemplate);
+        int ret = templateMatch(fpTemplate, saveTemplate);
         // 指纹已经存在，直接返回该指纹
         if (ret == GENERAL_RESULT_OK)
         {
@@ -252,19 +248,12 @@ QString FPZKDevice::identifyFeature(QByteArray fpTemplate, QList<QByteArray> exi
     return featureID;
 }
 
-bool FPZKDevice::saveFPrintTemplate(QByteArray fpTemplate, const QString& featureID)
-{
-    DeviceInfo deviceInfo = this->deviceInfo();
-    bool save = FeatureDB::getInstance()->addFeature(featureID, fpTemplate, deviceInfo, deviceType());
-    return save;
-}
-
 int FPZKDevice::getDevCount()
 {
     return m_driver->ZKFPM_GetDeviceCount();
 }
 
-void FPZKDevice::enrollTemplateMerge()
+void FPZKDevice::templateMerge()
 {
     QString message;
     // 将三个模板merge
@@ -277,12 +266,12 @@ void FPZKDevice::enrollTemplateMerge()
     }
 
     // 合成后的指纹与先前录入的指纹进行匹配
-    int matchResult = enrollTemplateMatch(m_enrollTemplates.value(0), regTemplate);
+    int matchResult = templateMatch(m_enrollTemplates.value(0), regTemplate);
     if (matchResult == GENERAL_RESULT_OK)
     {
         QString featureID = QCryptographicHash::hash(regTemplate, QCryptographicHash::Md5).toHex();
         // 该指纹没有录入过,进行指纹保存
-        if (saveFPrintTemplate(regTemplate, featureID))
+        if (saveTemplate(regTemplate, featureID))
         {
             notifyEnrollProcess(ENROLL_PROCESS_SUCCESS, featureID);
         }
