@@ -152,10 +152,6 @@ QByteArray FVSDDevice::acquireFeature()
 void FVSDDevice::acquireFeatureStop()
 {
     m_driver->TGCancelGetImage();
-    if (!m_futureWatcher.isNull())
-    {
-        m_futureWatcher->waitForFinished();
-    }
 }
 
 void FVSDDevice::acquireFeatureFail()
@@ -199,7 +195,7 @@ void FVSDDevice::saveEnrollTemplateToCache(QByteArray image)
  * NOTE:短时间内播放两次声音，前一次未结束的话，会被后面的声音覆盖
  * 重复录入的声音 会被 下一次录入的播放声音覆盖
  */
-void FVSDDevice::enrollTemplateMerge()
+void FVSDDevice::templateMerge()
 {
     QByteArray multiFeature;
     Q_FOREACH (auto enrollTemplate, m_enrollTemplates)
@@ -316,7 +312,7 @@ QByteArray FVSDDevice::getFeatureFromImage(QByteArray image, ExtractFeatureMode 
     return QByteArray();
 }
 
-int FVSDDevice::enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
+int FVSDDevice::templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2)
 {
     /**
      * NOTE:

@@ -20,16 +20,14 @@
 
 namespace Kiran
 {
-typedef void* HANDLE;
-class FPZKDriver;
+class FPZADriver;
 
-class FPZKDevice : public BioDevice
-{
+class FPZADevice : public BioDevice
+{    
     Q_OBJECT
 public:
-    explicit FPZKDevice(const QString &vid, const QString &pid, DriverPtr driver,QObject* parent = nullptr);
-    ~FPZKDevice();
-
+    explicit FPZADevice(const QString& vid, const QString& pid, DriverPtr driver, QObject* parent = nullptr);
+    ~FPZADevice();
 
 private:
     bool initDevice() override;
@@ -42,22 +40,14 @@ private:
     void notifyEnrollProcess(EnrollProcess process, const QString& featureID = QString()) override;
     void notifyIdentifyProcess(IdentifyProcess process, const QString& featureID = QString()) override;
 
-    Handle openDevice();
-
-    // 将3枚指纹模板合并为一枚
-    QByteArray templateMerge(QByteArray fpTemplate1,
-                             QByteArray fpTemplate2,
-                             QByteArray fpTemplate3);
-
     // 对比两枚指纹是否匹配
     int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
 
     QString identifyFeature(QByteArray fpTemplate, QList<QByteArray> existedfeatures) override;
 
-    int getDevCount();
+    int openBioDevice() override;
 
 private:
-    Handle m_hDBCache;
-    QSharedPointer<FPZKDriver> m_driver;
+    QSharedPointer<FPZADriver> m_driver;
 };
 }  // namespace Kiran

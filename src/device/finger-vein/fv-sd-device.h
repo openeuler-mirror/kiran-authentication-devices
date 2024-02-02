@@ -40,8 +40,8 @@ private:
     void acquireFeatureStop() override;
     void acquireFeatureFail() override;
 
-    int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
-    void enrollTemplateMerge() override;
+    int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) override;
+    void templateMerge() override;
     void saveEnrollTemplateToCache(QByteArray enrollTemplate) override;
     void enrollProcessRetry() override;
 

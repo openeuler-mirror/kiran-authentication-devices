@@ -31,8 +31,9 @@ protected:
     virtual void acquireFeatureFail() = 0;
     virtual QString identifyFeature(QByteArray feature, QList<QByteArray> existedfeatures) = 0;
 
-    virtual void enrollTemplateMerge(){};
-    virtual int enrollTemplateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) { return GENERAL_RESULT_OK; };
+    virtual void templateMerge(){};
+    // 特征/模板一对一匹配
+    virtual int templateMatch(QByteArray fpTemplate1, QByteArray fpTemplate2) { return GENERAL_RESULT_OK; };
 
     virtual void deviceStopEnroll() override;
     virtual void deviceStopIdentify() override;
@@ -44,6 +45,10 @@ protected:
 
     QByteArrayList enrollTemplatesFromCache();
     virtual void saveEnrollTemplateToCache(QByteArray enrollTemplate);
+
+    // TODO：名称不太合适，需要优化
+    virtual int openBioDevice();
+    bool saveTemplate(QByteArray &featureTemplate, const QString &featureID);
 
 private Q_SLOTS:
     void handleAcquiredFeature();
