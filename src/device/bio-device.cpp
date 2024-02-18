@@ -46,6 +46,8 @@ void BioDevice::doingEnrollStart(const QString &extraInfo)
         return;
     }
     m_doAcquire = true;
+    openBioDevice();
+
     auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
     m_futureWatcher->setFuture(future);
 
@@ -69,6 +71,7 @@ void BioDevice::doingIdentifyStart(const QString &value)
 {
     KLOG_DEBUG() << "biological information identify start";
     m_doAcquire = true;
+    openBioDevice();
     auto future = QtConcurrent::run(this, &BioDevice::acquireFeature);
     m_futureWatcher->setFuture(future);
 
@@ -104,26 +107,29 @@ void BioDevice::doingEnrollProcess(QByteArray feature)
             notifyEnrollProcess(ENROLL_PROCESS_REPEATED_ENROLL, featureID);
             internalStopEnroll();
         }
+        return;
     }
-    else if (templatesCount < mergeTemplateCount())
+
+    // 判断录入时是否录的是同一根手指
+    int matchResult = templateMatch(m_enrollTemplates.value(0), feature);
+
+    if (matchResult != GENERAL_RESULT_OK)
     {
-        // 判断录入时是否录的是同一根手指
-        int matchResult = enrollTemplateMatch(m_enrollTemplates.value(0), feature);
-        if (matchResult == GENERAL_RESULT_OK)
-        {
-            saveEnrollTemplateToCache(feature);
-        }
-        else
-        {
-            notifyEnrollProcess(ENROLL_PROCESS_INCONSISTENT_FEATURE);
-        }
+        notifyEnrollProcess(ENROLL_PROCESS_INCONSISTENT_FEATURE);
         enrollProcessRetry();
+        return;
     }
-    else if (enrollTemplatesFromCache().count() == mergeTemplateCount())
+
+    saveEnrollTemplateToCache(feature);
+
+    if (enrollTemplatesFromCache().count() != mergeTemplateCount())
     {
-        enrollTemplateMerge();
-        internalStopEnroll();
+        enrollProcessRetry();
+        return;
     }
+
+    templateMerge();
+    internalStopEnroll();
 }
 
 void BioDevice::doingIdentifyProcess(QByteArray feature)
@@ -185,9 +191,24 @@ void BioDevice::saveEnrollTemplateToCache(QByteArray enrollTemplate)
     }
 }
 
+int BioDevice::openBioDevice()
+{
+    return 0;
+}
+
+bool BioDevice::saveTemplate(QByteArray &featureTemplate, const QString &featureID)
+{
+    bool save = FeatureDB::getInstance()->addFeature(featureID, featureTemplate, deviceInfo(), deviceType());
+    return save;
+}
+
 void BioDevice::deviceStopEnroll()
 {
     acquireFeatureStop();
+    if (!m_futureWatcher.isNull())
+    {
+        m_futureWatcher->waitForFinished();
+    }
     m_enrollTemplates.clear();
 }
 

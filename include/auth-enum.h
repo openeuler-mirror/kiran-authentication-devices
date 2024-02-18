@@ -29,6 +29,7 @@ namespace Kiran
 #define IRISTAR_DRIVER_NAME "irs_sdk2"
 #define FINGERPRINT_ZK_DRIVER_NAME "zkfp"
 #define FINGER_VEIN_SD_DRIVER_NAME "sdfv"
+#define FINGERPRINT_ZA_DRIVER_NAME "zaz"
 
 struct DeviceInfo
 {
