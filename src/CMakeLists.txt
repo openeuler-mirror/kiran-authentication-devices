@@ -60,9 +60,6 @@ target_link_libraries(${PROJECT_NAME}
                         ${CMAKE_DL_LIBS}
                         )
 
-target_link_directories(${PROJECT_NAME} PRIVATE
-                      )
-
 install(TARGETS ${PROJECT_NAME} 
     DESTINATION ${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR})    
 
