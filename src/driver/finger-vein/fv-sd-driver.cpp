@@ -16,8 +16,8 @@
 #include <dlfcn.h>
 #include <qt5-log-i.h>
 #include "auth-enum.h"
-#include "sdfv.h"
 #include "driver/driver-factory.h"
+#include "sdfv.h"
 
 namespace Kiran
 {
@@ -87,7 +87,7 @@ struct FVSDDriverLib
 
 REGISTER_DRIVER(FINGER_VEIN_SD_DRIVER_NAME, FVSDDriver);
 
-FVSDDriver::FVSDDriver(QObject *parent) : Driver(parent)
+FVSDDriver::FVSDDriver(QObject *parent) : Driver(parent), m_libProcessHandle(NULL), m_libComHandle(NULL)
 {
     m_driverLib.reset(new FVSDDriverLib);
     setName(FINGER_VEIN_SD_DRIVER_NAME);
